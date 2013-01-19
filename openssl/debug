@@ -1,0 +1,7 @@
+set history save on
+file ./gdb_test.exe
+# tty /dev/pts/1
+break main
+run
+next
+
