@@ -211,7 +211,7 @@ int Sign_and_encrypt_plain_text(RSA *receiver_pub_key_for_encrypt,
 
     while (bytes_remaining > 0) {
         /* encrypt b_per_ct bytes up until the last loop, where it may be fewer. */
-        if (!RSA_public_encrypt(MIN(bytes_remaining,(int)b_per_ct), ptr, p,
+        if (!RSA_public_encrypt(SSL_MIN(bytes_remaining,(int)b_per_ct), ptr, p,
                                 receiver_pub_key_for_encrypt,
                                 padding_mode)) {        
         /* the operation of encrypt failed during the encrypt process. */

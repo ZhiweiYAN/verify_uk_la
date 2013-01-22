@@ -1,12 +1,12 @@
 /*
  * =====================================================================================
  *
- *       Filename:  verify_uk_main.h
+ *       Filename:  verify_uk_init.h
  *
  *    Description:  
  *
  *        Version:  1.0
- *        Created:  1/19/2013 10:00:23 PM
+ *        Created:  1/19/2013 10:32:29 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
@@ -16,11 +16,17 @@
  * =====================================================================================
  */
 
-#ifndef  VERIFY_UK_MAIN_H_INC
-#define  VERIFY_UK_MAIN_H_INC
+#ifndef  VERIFY_UK_START_H_INC
+#define  VERIFY_UK_START_H_INC
 
-#include <glog/logging.h>
 #include "verify_uk_common.h"
-#include "verify_uk_start.h"
+#include "verify_uk_init.h"
+#include "verify_uk_monitor_process.h"
+#include "verify_uk_verify.h"
 
-#endif   /* ----- #ifndef VERIFY_UK_MAIN_H_INC  ----- */
+
+int Init_verify_uk_server(void);
+int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa);
+
+
+#endif   /* ----- #ifndef VERIFY_UK_INIT_H_INC  ----- */

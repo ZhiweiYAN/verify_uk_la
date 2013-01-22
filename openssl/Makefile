@@ -18,7 +18,7 @@ endif
 INC_DIR_FLAGS=-I /usr/include
 LIB_OPTIONS=-lglog -lcrypto
 
-OBJS=open_ssl_main.o openSSL_sign_encrypt_RSA.o
+OBJS=open_ssl_main.o openssl_sign_encrypt_rsa.o
 
 $(TARGET):$(OBJS)
 	$(CC) -o $(TARGET) $(OBJS) $(LIB_OPTIONS)

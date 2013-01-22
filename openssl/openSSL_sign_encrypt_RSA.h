@@ -38,7 +38,7 @@
 
 #include <glog/logging.h>
 
-#define MIN(x,y) ((x) > (y) ? (y) : (x))
+#define SSL_MIN(x,y) ((x) > (y) ? (y) : (x))
 
 // #define RSA_PKCS_PADDING_MODE RSA_PKCS1_OAEP_PADDING
 #define SHA1_LEN 	20

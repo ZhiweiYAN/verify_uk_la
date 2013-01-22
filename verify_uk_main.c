@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
     }
 
 
-    //ret = Init_db_server();
+    ret = Init_verify_uk_server();
 
     LOG(INFO)  <<  "==================END Verify UK Server LOG=================.";
     google::ShutdownGoogleLogging();

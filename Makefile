@@ -30,7 +30,8 @@ GLOG_LIB=-L /usr/lib
 INC_DIR_FLAGS=$(GLOG_INC) $(PG_INC)
 
 OBJS=verify_uk_main.o  verify_uk_init.o \
-		./openssl/openSSL_sign_encrypt_RSA.o \
+		shmsem.o verify_uk_start.o verify_uk_monitor_process.o  \
+		./openssl/openssl_sign_encrypt_rsa.o \
 		../config_h_c/config.o
 
 
