@@ -88,7 +88,7 @@
 #define MAX_TEMP_SIZE   40000
 
 
-#define PROCESS_SHARE_ID 108 
+#define PROCESS_SHARE_ID 108
 
 #define BACKLOG 1024
 #define MAX_PROCESS_NUMBRER 1024
@@ -103,18 +103,20 @@
 #define COMM_LENGTH 256
 
 
-enum VERIFY_ERROR_CODE{
-	ERROR_DECRYPT = -1,
-	ERROR_VALIDATE_SIGN = -2,
-	ERROR_LINK_PROXY = -3,
-	ERROR_INCOMPLETE_PKT = -4,
-	ERROR_NO_TERMINAL_RSA_PUBKEY = -5,
-	ERROR_NO_SRV_RSA_PRIKEY = -6	
+enum VERIFY_ERROR_CODE {
+    ERROR_DECRYPT = -1,
+    ERROR_VALIDATE_SIGN = -2,
+    ERROR_LINK_PROXY = -3,
+    ERROR_INCOMPLETE_PKT = -4,
+    ERROR_NO_TERMINAL_RSA_PUBKEY = -5,
+    ERROR_NO_SRV_RSA_PRIKEY = -6,
+    ERROR_MEMORY_LACK = -7
 };
 
 
 #ifdef DEBUG
 # define DBG(format, args...) printf(format, ##args)
+# define DBG_WAIT {sleep(15);}
 #else
 # define DBG(format, args...)
 #endif
@@ -123,12 +125,13 @@ enum VERIFY_ERROR_CODE{
 #define OUTPUT_ERROR do{ printf("[\033[31mERROR\033[0m] %s:%d,%s()\n",__FILE__, __LINE__, __FUNCTION__);LOG(ERROR)<<__FUNCTION__;fflush(NULL);}while(0);
 
 //Fesponse code for downlink to terminals.
-enum ResponseCodeFromVerifySrv{RSP_SUCCESS=0,
-	RSP_UN_CRYPT_ERROR=1, 
-	RSP_UN_SIGN=2,
-	RSP_PROXY_LINK_DOWN=3,
-	RSP_OTHER_UNKNOW_ERROR=9
-};
+enum ResponseCodeFromVerifySrv {RSP_SUCCESS=0,
+                                RSP_UN_CRYPT_ERROR=1,
+                                RSP_UN_SIGN=2,
+                                RSP_PROXY_LINK_DOWN=3,
+                                RSP_OTHER_UNKNOW_ERROR=9
+                               };
+
 
 struct CommonPacketHeader {
     char company_id[COMPANY_ID_LENGTH+1];
@@ -144,13 +147,13 @@ struct CommonPacketHeader {
 };
 
 
-struct VerifyPacketHeader{
-	char msg_type[VERIFY_PKT_MSG_TYPE_LENGTH+1];
-	char terminal_id[VERIFY_PKT_TERMINAL_ID_LENGTH+1];
-	char worker_id[VERIFY_PKT_WORKER_ID_LENGTH+1];
-	char rsp_memo_type[VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH+1];
-	char rsp_memo_txt[VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH+1];
-	int payload_len;
+struct VerifyPacketHeader {
+    char msg_type[VERIFY_PKT_MSG_TYPE_LENGTH+1];
+    char terminal_id[VERIFY_PKT_TERMINAL_ID_LENGTH+1];
+    char worker_id[VERIFY_PKT_WORKER_ID_LENGTH+1];
+    char rsp_memo_type[VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH+1];
+    char rsp_memo_txt[VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH+1];
+    int payload_len;
 };
 
 

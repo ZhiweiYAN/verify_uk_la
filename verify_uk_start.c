@@ -19,26 +19,26 @@
 #include "verify_uk_start.h"
 
 /*
-* Initiailize all things, 
+* Initiailize all things,
 *
 */
 int Init_verify_uk_server(void)
 {
-	int ret = 0;
+    int ret = 0;
 
-	/* for socket conncetions */
-	int welcome_sd_trans = 0;	/* socket for normal transaction packets from clients */
-	struct sockaddr_in sa_trans;
+    /* for socket conncetions */
+    int welcome_sd_trans = 0;	/* socket for normal transaction packets from clients */
+    struct sockaddr_in sa_trans;
 
-	//int welcome_sd_update_server_pub_key = 0; /*socket for updating server public key*/
+    //int welcome_sd_update_server_pub_key = 0; /*socket for updating server public key*/
 
 
-	/* pid for the daemon process management */
-	pid_t pid_daemon_trans = 0;
+    /* pid for the daemon process management */
+    pid_t pid_daemon_trans = 0;
 
-	LOG(INFO)<<"================ Initialization Step I =====================";
-	printf("\n================ Initialization Step I =====================\n");
-	
+    LOG(INFO)<<"================ Initialization Step I =====================";
+    printf("\n================ Initialization Step I =====================\n");
+
     /* Read parameters from the configuration files. */
     ret  = Setup_config_parameters();
     LOG(INFO)<<"Reading parameters from the config file:";
@@ -50,7 +50,7 @@ int Init_verify_uk_server(void)
     } else {
         LOG(INFO)<<"[Success!]";
         OUTPUT_OK;
-    }	
+    }
 
     LOG(INFO)<<"Read the public key and private key of its server";
     printf("\nRead the public key and private key of its server:");
@@ -63,7 +63,7 @@ int Init_verify_uk_server(void)
         LOG(INFO)<<"[Success!]";
         OUTPUT_OK;
     }
-    
+
     /* Initialize PROCESS MANGER semaphore and One block memory for process*/
     ret  = Init_process_manager_share_memory(PROCESS_SHARE_ID);
     LOG(INFO)<<"Initialize the PROCESS MANAGMENT share memory and semaphore:";
@@ -131,43 +131,43 @@ int Init_verify_uk_server(void)
             LOG(ERROR)<<"[Daemon__trans_server, !Failed]";
             exit(0);
         };
-    }	
+    }
 
     LOG(INFO)<<"================ Initialization Step II =====================";
     printf("\n================ Initialization Step II =====================\n");
 
 
-/*
-    LOG(INFO)<<"================ Initialization Step III =====================";
-    printf("\n================ Initialization Step III =====================\n");
-    ret  = Test_connection_db_server(global_par.system_par.database_user[0],
-                                     global_par.system_par.database_password[0],
-                                     global_par.system_par.database_name,
-                                     global_par.system_par.localhost_ip_address);
-    LOG(INFO)<<"Testing OWNSELF DB connections:";
-    printf("Testing OWNSELF DB connections:");
-    if (-1 == ret ) {
-        LOG(ERROR)<<"[!Failed]";
-        LOG(ERROR)<<"Detail: "
-                  <<global_par.system_par.database_user[0]
-                  <<global_par.system_par.database_password[0]
-                  <<global_par.system_par.database_name
-                  <<global_par.system_par.verify_ip_addr_array[0];
-        OUTPUT_ERROR;
-        return -1;
-    } else {
-        ret  = Set_ownself_server_mode(READY);
-        LOG(INFO)<<"[Success!]";
-        OUTPUT_OK;
-    }
-	
-*/
+    /*
+        LOG(INFO)<<"================ Initialization Step III =====================";
+        printf("\n================ Initialization Step III =====================\n");
+        ret  = Test_connection_db_server(global_par.system_par.database_user[0],
+                                         global_par.system_par.database_password[0],
+                                         global_par.system_par.database_name,
+                                         global_par.system_par.localhost_ip_address);
+        LOG(INFO)<<"Testing OWNSELF DB connections:";
+        printf("Testing OWNSELF DB connections:");
+        if (-1 == ret ) {
+            LOG(ERROR)<<"[!Failed]";
+            LOG(ERROR)<<"Detail: "
+                      <<global_par.system_par.database_user[0]
+                      <<global_par.system_par.database_password[0]
+                      <<global_par.system_par.database_name
+                      <<global_par.system_par.verify_ip_addr_array[0];
+            OUTPUT_ERROR;
+            return -1;
+        } else {
+            ret  = Set_ownself_server_mode(READY);
+            LOG(INFO)<<"[Success!]";
+            OUTPUT_OK;
+        }
+
+    */
 
 
 
-	/* Function END */
-	return 1;	
-	
+    /* Function END */
+    return 1;
+
 }
 
 
@@ -228,6 +228,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
 
             /* In the grandchild process */
             /* Allocate memory for receiving data */
+
             ret  = Insert_pid_process_table(getpid(),VERIFY_PROCESS_DEADLINE,VERIFY_PROCESS);
             buf_recv = (char*)malloc(sizeof(char)*MAX_SIZE_BUFFER_RECV);
             if (NULL==buf_recv) {
@@ -238,7 +239,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
                 bzero(buf_recv,MAX_SIZE_BUFFER_RECV);
             }
 
-            /* BUSINESS:Receiving data from business servers*/
+            /* Terminal:Receiving data from terminals*/
             count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
             LOG(INFO)<<"Verify UK: Recv data from Terminal.";
             LOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";

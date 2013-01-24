@@ -62,21 +62,27 @@
 */
 #define RSA_PKCS_PADDING_MODE RSA_PKCS1_PADDING
 #define FIXED_BYTES_TO_BE_ENCRYPTED_PER_TIME 100
-//#define BYTES_TO_BE_ENCRYPTED_PER_TIME(x) {RSA_size(x) - (20*2 +2)} 
+//#define BYTES_TO_BE_ENCRYPTED_PER_TIME(x) {RSA_size(x) - (20*2 +2)}
+
+char *base64(const unsigned char *input, int length);
+char *unbase64(unsigned char *input, int length);
+unsigned char *DER_encode_RSA_public(RSA *rsa, int *len);
+RSA *DER_decode_RSA_public(unsigned char *buf, long len);
+
 
 int Save_private_key_to_file(RSA *rsa, char* key_file);
 RSA* Get_private_key_from_file(RSA *rsa, char* key_file);
 
-void Remove_private_key(RSA *r); 
+void Remove_private_key(RSA *r);
 
 
 
-int Sign_and_encrypt_plain_text(RSA *receiver_pub_key_for_encrypt, RSA *signers_private_key_for_signature, 
-	unsigned char *plain_text, unsigned int  plain_text_len, 
-	unsigned char **cipher_text, unsigned int *cipher_text_len);
-int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt, RSA *signers_pub_key_for_signature, 
-	unsigned char *cipher_text, unsigned int cipher_text_len, 
-	unsigned char **plain_text, unsigned int *plain_text_len);
+int Sign_and_encrypt_plain_text(RSA *receiver_pub_key_for_encrypt, RSA *signers_private_key_for_signature,
+                                unsigned char *plain_text, unsigned int  plain_text_len,
+                                unsigned char **cipher_text, unsigned int *cipher_text_len);
+int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt, RSA *signers_pub_key_for_signature,
+                              unsigned char *cipher_text, unsigned int cipher_text_len,
+                              unsigned char **plain_text, unsigned int *plain_text_len);
 
-#endif  
- /* ----- #ifndef OPENSSL_SIGN_ENCRYPT_RSA_H_INC  ----- */
+#endif
+/* ----- #ifndef OPENSSL_SIGN_ENCRYPT_RSA_H_INC  ----- */

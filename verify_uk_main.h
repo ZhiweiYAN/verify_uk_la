@@ -3,7 +3,7 @@
  *
  *       Filename:  verify_uk_main.h
  *
- *    Description:  
+ *    Description:
  *
  *        Version:  1.0
  *        Created:  1/19/2013 10:00:23 PM

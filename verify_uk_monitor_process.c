@@ -149,8 +149,8 @@ int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs
             fflush(NULL);
         }
     }
-    for (j=0; j<prcs_num; j++){
-        if(0==(ptr+j)->pid){
+    for (j=0; j<prcs_num; j++) {
+        if(0==(ptr+j)->pid) {
             available_slot_sum ++;
         }
     }
@@ -184,8 +184,8 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
         }
     }
 
-    for (j=0; j<prcs_num; j++){
-        if(0==(ptr+j)->pid){
+    for (j=0; j<prcs_num; j++) {
+        if(0==(ptr+j)->pid) {
             available_slot_sum ++;
         }
     }
@@ -275,7 +275,7 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
         }
     }
 
-	return 1;
+    return 1;
 }
 
 

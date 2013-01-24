@@ -10,14 +10,14 @@
 
 /* *************************************************
  *  \brief
- *    receive all of the data(< MAXPACKETSIZE)
+ *    receive all of the data(< SOCKET_MAXPACKETSIZE)
  *
  * Function Name:
  * 		int multi_recv(int socket_fd, char *buf_recv, size_t recv_len, int flags)
  *
  * Input:
  *		int socket_fd ---> socket
- *		size_t recv_len ---> length of received data(MAXPACKETSIZE)
+ *		size_t recv_len ---> length of received data(SOCKET_MAXPACKETSIZE)
  *		int flags ---> flags parameter
  *
  * Output:
@@ -51,14 +51,14 @@ int multi_recv(int socket_fd, char *buf_recv, size_t recv_len, int flags)
         return -1;
     }
 
-    /*judge whether buf_rev has enough space to save, when larger than MAXPACKETSIZE, recv MAXPACKETSIZE-1*/
-    if (recv_packet_len > (MAXPACKETSIZE - 1)) {
-        printf("\033[01;31merror@multi_recvsend.c:multi_recv():The buffer of data channel is too small, please increase MAXPACKETSIZE!\033[0m\n");
-        recv_packet_len = MAXPACKETSIZE - 1;
+    /*judge whether buf_rev has enough space to save, when larger than SOCKET_MAXPACKETSIZE, recv SOCKET_MAXPACKETSIZE-1*/
+    if (recv_packet_len > (SOCKET_MAXPACKETSIZE - 1)) {
+        printf("\033[01;31merror@multi_recvsend.c:multi_recv():The buffer of data channel is too small, please increase SOCKET_MAXPACKETSIZE!\033[0m\n");
+        recv_packet_len = SOCKET_MAXPACKETSIZE - 1;
     }
 
     /*recv packet that needed*/
-    bzero(buf_recv, MAXPACKETSIZE);
+    bzero(buf_recv, SOCKET_MAXPACKETSIZE);
     while ((int)recv_packet_len > total_count) {
         /*recv packet one time*/
         if ((count = recv(socket_fd, (void*)(buf_recv + total_count), recv_len, flags)) < 0) {
@@ -73,7 +73,7 @@ int multi_recv(int socket_fd, char *buf_recv, size_t recv_len, int flags)
 
 /* *************************************************
  *  \brief
- *    send all of the data(< MAXPACKETSIZE)
+ *    send all of the data(< SOCKET_MAXPACKETSIZE)
  *
  * Function Name:
  * 		int multi_send(int socket_fd, const char *buf_send, size_t send_len, int flags)
@@ -105,10 +105,10 @@ int multi_send(int socket_fd, const char *buf_send, size_t send_len, int flags)
     }
     /*Add by yanzw END */
 
-    /*judge whether send_len is larger than MAXPACKETSIZE*/
-    if (send_len > (MAXPACKETSIZE - 1)) {
-        printf("\033[01;31merror@multi_recvsend.c:multi_send():The buffer of data channel is too small, please increase MAXPACKETSIZE!\033[0m\n");
-        send_len = MAXPACKETSIZE - 1;
+    /*judge whether send_len is larger than SOCKET_MAXPACKETSIZE*/
+    if (send_len > (SOCKET_MAXPACKETSIZE - 1)) {
+        printf("\033[01;31merror@multi_recvsend.c:multi_send():The buffer of data channel is too small, please increase SOCKET_MAXPACKETSIZE!\033[0m\n");
+        send_len = SOCKET_MAXPACKETSIZE - 1;
     }
 
     /*send the packet length*/

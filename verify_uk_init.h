@@ -3,7 +3,7 @@
  *
  *       Filename:  verify_uk_init.h
  *
- *    Description:  
+ *    Description:
  *
  *        Version:  1.0
  *        Created:  1/22/2013 7:14:15 PM
