@@ -9,7 +9,7 @@
 #ifndef 	PARSE_PKT_COMMON_HEADER_H_
 #define 	PARSE_PKT_COMMON_HEADER_H_
 
-#include "primary_db_common.h"
+#include "verify_uk_common.h"
 int Get_common_header(char *packet, struct CommonPacketHeader *common_pkt_header);
 int Get_common_header_company_id(char *packet, char *company_id);
 int Get_common_header_service_id(char *packet, char *service_id);

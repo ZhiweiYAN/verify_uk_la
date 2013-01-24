@@ -16,28 +16,229 @@
  * =====================================================================================
  */
 #include "verify_uk_verify.h"
-int Do_verify_procedures(int connection_sd,char *packet,int packet_size)
-{
-    int success = 0;
 
+
+int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
+{
+	int ret = 0;
+
+    char send_terminal[MAXPACKETSIZE];	
+	//char send_proxy[MAXPACKETSIZE];
+	int pre_pkt_len =0 ;
+	
+    ssize_t count = 0;
+
+	unsigned char *cipher_text = NULL;
+	unsigned int   cipher_text_len = 0;
+	unsigned char *to_proxy_plain_text = NULL;
+	unsigned int   to_proxy_plain_text_len = 0;
+
+	VerifyPacketHeader veri_pkt_hdr;
+	RSA terminal_pub_key;
+	RSA server_private_key;
+	
+    bzero(send_terminal, MAXPACKETSIZE);
+
+	//get verifing-packet header and parse the verifing-packet header
+	bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
+	ret = Parse_verify_pkt_header(packet, packet_size, &veri_pkt_hdr);
+	if(-1 == ret){
+		LOG(ERROR)<<"Parse verify pkt header, error.";
+		OUTPUT_ERROR;
+		ret = PrepareErrorResPacket(send_terminal, ERROR_INCOMPLETE_PKT);
+		goto Do_verify_procedures_END;
+		}
+
+	//get the public key of terminal
+	ret = Get_terminal_pub_key(&terminal_pub_key, &veri_pkt_hdr);
+	if (-1==ret){
+		LOG(ERROR)<<"pub_key_of_the_terminal_id, found nothing on server side, error.";
+		OUTPUT_ERROR;
+		ret = PrepareErrorResPacket(send_terminal, ERROR_NO_TERMINAL_RSA_PUBKEY);
+		goto Do_verify_procedures_END;
+		}
+
+	//get the private key of verify server
+	ret = Get_server_private_key(&server_private_key);
+	if (-1==ret){
+		LOG(ERROR)<<"while finding private key of server, nothing on server side, error.";
+		OUTPUT_ERROR;
+		ret = PrepareErrorResPacket(send_terminal, ERROR_NO_SRV_RSA_PRIKEY);		
+		goto Do_verify_procedures_END;
+		}
+	
+	cipher_text = (unsigned char *)packet + VERIFY_PKT_HEADER_LENGTH;
+	cipher_text_len = (unsigned int) (veri_pkt_hdr.payload_len);
+	to_proxy_plain_text = NULL;
+	to_proxy_plain_text_len = 0;
+	
+	//De-encrypt and Validate signature
+	pre_pkt_len = VERIFY_PKT_HEADER_LENGTH-VERIFY_PKT_PAYLOAD_LEN_LENGTH-VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH;
+	memcpy(send_terminal, packet, pre_pkt_len);
+	
+	ret = decrypt_and_validate_sign(&server_private_key, &terminal_pub_key, 
+			cipher_text, cipher_text_len, 
+			&to_proxy_plain_text, &to_proxy_plain_text_len);
+
+	
+	if(1>to_proxy_plain_text_len || 1!=ret){
+		if(ERROR_DECRYPT==ret){
+			LOG(ERROR)<<"while decrypting cipher text, error.";
+			OUTPUT_ERROR;
+			PrepareErrorResPacket(send_terminal, ERROR_DECRYPT);
+			goto Do_verify_procedures_END;
+			}
+		
+		if(ERROR_VALIDATE_SIGN==ret){
+			LOG(ERROR)<<"while validating the signatures, error.";
+			OUTPUT_ERROR;
+			PrepareErrorResPacket(send_terminal, ERROR_VALIDATE_SIGN);
+			goto Do_verify_procedures_END;
+			}
+		
+	}
+
+	//connect to proxy server as random mode.
+
+	//connect to proxy server
+
+	//send plain text pkt to proxy server
+
+	//waiting for backward pkt from proxy server
+	
+	//add signature and en-crypt the backward pkt
+
+
+
+
+
+
+Do_verify_procedures_END:
+    count = send( connection_sd, send_terminal, strlen(send_terminal), 0 );
+    DBG("\n%s |%s|\n","send to Teminal",send_terminal);
+
+    if (0>count) {
+        OUTPUT_ERROR;
+    }
+
+    return 1;
+}
+
+
+int PrepareErrorResPacket(char *pkt, int error_code)
+{
+	int ret = 0;
+
+	// all default values for the following fields are spaces.
+	memset(pkt, 20, VERIFY_PKT_HEADER_LENGTH);
+
+	switch (error_code){
+		case ERROR_DECRYPT:
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "1", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, 
+				"while de-crypting cipher pkt with srv_rsa_private_key, error!",
+				VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+			break;
+		case ERROR_VALIDATE_SIGN:
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "2", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, 
+				"while validating terminal pkt with ukey rsa_pub_key, error!",
+				VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+			break;
+		case ERROR_LINK_PROXY:
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "3", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, 
+				"while connecting proxy link, error!",
+				VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+			break;
+		case ERROR_INCOMPLETE_PKT:
+				strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "4", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+				strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, 
+					"while parse pkt header, error!",
+					VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+				break;
+		case ERROR_NO_TERMINAL_RSA_PUBKEY:
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "5", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, 
+				"while finding terminal ukey rsa_pub_key, error!",
+				VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+			break;
+		case ERROR_NO_SRV_RSA_PRIKEY:
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "6", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+			strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, 
+				"while finding server ukey rsa_private_key, error!",
+				VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+			break;
+		default:
+			break;
+		}
+	
+	memset(pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, 0, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
+
+	return ret;
+
+	
+}
+
+
+int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_header)
+{
+	if(NULL==pkt){
+		LOG(ERROR)<<"NULL==pkt pointer";
+		return -1;
+		}
+
+	if(NULL==pkt_header){
+		LOG(ERROR)<<"NULL==pkt_header pointer";
+		return -1;
+		}
+
+	if(pkt_len<VERIFY_PKT_HEADER_LENGTH){
+		LOG(ERROR)<<"VERIFY_PKT_HEADER_LENGTH, too short, " <<pkt_len<< " less than " << VERIFY_PKT_HEADER_LENGTH;
+		return -1;
+		}
+
+	bzero(pkt_header, sizeof(VerifyPacketHeader));
+	
+	memcpy(pkt_header->msg_type, pkt+VERIFY_PKT_MSG_TYPE_POSITION, VERIFY_PKT_MSG_TYPE_LENGTH);
+	memcpy(pkt_header->terminal_id, pkt+VERIFY_PKT_TERMINAL_ID_POSITION, VERIFY_PKT_TERMINAL_ID_LENGTH);
+	memcpy(pkt_header->worker_id, pkt+VERIFY_PKT_WORKER_ID_POSITION, VERIFY_PKT_WORKER_ID_LENGTH);
+	memcpy(pkt_header->rsp_memo_type, pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION);
+	memcpy(pkt_header->rsp_memo_txt, pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+	memcpy(&(pkt_header->payload_len), pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
+
+	return 1;
+	
+}
+
+
+int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
+{
+	
     PGconn* conn_db = NULL;
 
-    char send_terminal[MAXPACKETSIZE];
-    ssize_t count = 0;
-    int com_id = 0;
+	if(NULL==key){
+		LOG(ERROR)<<"NULL==key,input parameters, failed.";
+		OUTPUT_ERROR;
+		return -1;
+		}
+	if(NULL==pkt_header){
+		LOG(ERROR)<<"NULL==pkt_header, input parameters, failed.";
+		OUTPUT_ERROR;
+		return -1;
+		}
 
-	//get verifing-packet header
+	
+	//SQL string is created
+    char query_string[MAX_QUERY_LENGTH];
+	//char private_key_verify_server[MAX_TEMP_SIZE];	
 
-	//parse the verifing-packet header
+    bzero(query_string,MAX_QUERY_LENGTH);
 
-	//get the public key of clients and the private key of verify server.
-
-
-    bzero(send_terminal, MAXPACKETSIZE);
-    conn_db = Connect_db_server(global_par.system_par.database_user[0],
-                                global_par.system_par.database_password[0],
-                                global_par.system_par.database_name,
-                                global_par.system_par.localhost_ip_address);
+	conn_db = Connect_db_server(global_par.system_par.verify_database_user[0],
+                                global_par.system_par.verify_database_password[0],
+                                global_par.system_par.verify_database_name,
+                                global_par.system_par.verify_ip_addr_array[0]);
 
 
     if (NULL==conn_db) {
@@ -49,32 +250,15 @@ int Do_verify_procedures(int connection_sd,char *packet,int packet_size)
     PQfinish((PGconn*)(conn_db));
     conn_db = NULL;
 
-	//verify the packet of terminals.
-
-
-	//connect to proxy server as random mode.
-
-
-	//
-
-	
-
-    if (0!=success) {
-        OUTPUT_ERROR;
-    }
-
-    count = send(connection_sd, send_terminal, strlen(send_terminal), 0 );
-    DBG("\n%s |%s|\n","send to Teminal",send_terminal);
-
-    if (0>count) {
-        OUTPUT_ERROR;
-    }
-
-
-
-    return 1;
+	return 1;
+		
 }
 
+int Get_server_private_key(RSA *server_private_key)
+{
+
+	return 1;
+}
 
 /*
  * ===  FUNCTION  ======================================================================
@@ -86,144 +270,13 @@ int Record_pkt_regular_table( char *pkt, int pkt_size,
                               PGconn *conn_db,
                               char* backward_pkt)
 {
-    char query_string[MAX_QUERY_LENGTH];
-    int success = 0;
-    PGresult *res = NULL;
-    char *back_pkt = NULL;
-    char *fwd_pkt = NULL;
-
-    struct CompoundPacketInfo com_pkt_info;
-
-    if (NULL==pkt) {
-        OUTPUT_ERROR;
-        return -1;
-    }
-    if (0>=pkt_size) {
-        OUTPUT_ERROR;
-        LOG(INFO)<<pkt;
-        return -1;
-    }
-
-    if (NULL==conn_db) {
-        OUTPUT_ERROR;
-        LOG(INFO)<<pkt;
-        return -1;
-    }
-
-    if (NULL==backward_pkt) {
-        OUTPUT_ERROR;
-        LOG(INFO)<<pkt;
-        return -1;
-    }
-
-    bzero(&com_pkt_info,sizeof(struct CompoundPacketInfo));
-    success = Get_compound_pkt_info(pkt, pkt_size,&com_pkt_info);
-
-    /* allocate the backward packet memory and reconstruct the backward packet */
-    back_pkt = (char *)malloc(pkt_size+1);
-    if (NULL==back_pkt) {
-        OUTPUT_ERROR;
-        return -1;
-    }
-    bzero(back_pkt,pkt_size+1);
-
-    memcpy(back_pkt, pkt, PACKET_HEADER_LENGTH);
-    memcpy(back_pkt+PACKET_HEADER_LENGTH,
-           pkt+PACKET_HEADER_LENGTH+com_pkt_info.forward_pkt_len,
-           com_pkt_info.backward_pkt_len);
-    memset(back_pkt+PACKET_HEADER_LENGTH-ERROR_MEMO_LENGTH,
-           ' ',
-           ERROR_MEMO_LENGTH);
-
-    /* allocate the forward packet memory and reconstruct the forward packet */
-    fwd_pkt = (char *)malloc(pkt_size+1);
-    if (NULL==fwd_pkt) {
-        OUTPUT_ERROR;
-        return -1;
-    }
-    bzero(fwd_pkt,pkt_size+1);
-    memcpy(fwd_pkt, pkt, PACKET_HEADER_LENGTH);
-    memcpy(fwd_pkt+PACKET_HEADER_LENGTH,
-           pkt+PACKET_HEADER_LENGTH,
-           com_pkt_info.forward_pkt_len);
-    memset(fwd_pkt+PACKET_HEADER_LENGTH-ERROR_MEMO_LENGTH,
-           ' ',
-           ERROR_MEMO_LENGTH);
-
-    //SQL string is created
-    bzero(query_string,MAX_QUERY_LENGTH);
-
-    if (INVOICE_DB == Get_ownself_server_type()) {
-        success = Generate_company_record_with_invoice_from_two_packet(fwd_pkt,
-                  strlen(fwd_pkt),
-                  back_pkt,strlen(back_pkt),
-                  query_string,
-                  MAX_QUERY_LENGTH);
-    } else {
-        success = Generate_company_record_from_two_packet(fwd_pkt,
-                  strlen(fwd_pkt),
-                  back_pkt,strlen(back_pkt),
-                  query_string,
-                  MAX_QUERY_LENGTH);
-
-    }
-
-    /* Send the query to primary database */
-    res = PQexec(conn_db, query_string);
-    DBG("\n%s |%s|\n","Record: SQL string", query_string);
-	LOG(INFO)<<"Record: SQL string: "<<query_string;
-
-    /* Did the record action fail in the primary database? */
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        OUTPUT_ERROR;
-        perror(query_string);
-        perror(PQerrorMessage(conn_db));
-
-        LOG(INFO)<<query_string;
-        LOG(INFO)<<PQerrorMessage(conn_db);
-
-        success = Change_packet_response_code(back_pkt,strlen(back_pkt),DB_ERROR_RECORDSQL);
-    }
-    memcpy(backward_pkt, back_pkt, strlen(back_pkt));
-
-    PQclear(res);
-    res = NULL;
-
-    free(back_pkt);
-    back_pkt = NULL;
-    free(fwd_pkt);
-    fwd_pkt = NULL;
-
-    return success;
+    return 1;
 }
 
 
 int Get_back_pkt_for_business_srv(char *pkt,int pkt_size, char* backward_pkt)
 {
-    int success = 0;
-    char *back_pkt = NULL;
-
-    struct CompoundPacketInfo com_pkt_info;
-
-    bzero(&com_pkt_info,sizeof(struct CompoundPacketInfo));
-    success = Get_compound_pkt_info(pkt, pkt_size,&com_pkt_info);
-
-    back_pkt = (char *)malloc(pkt_size+1);
-    if (NULL==back_pkt) {
-        OUTPUT_ERROR;
-        return -1;
-    }
-    bzero(back_pkt,pkt_size+1);
-
-    /* Reconstruct the backward packet */
-    memcpy(back_pkt,pkt,PACKET_HEADER_LENGTH);
-    memcpy(back_pkt+PACKET_HEADER_LENGTH,pkt+PACKET_HEADER_LENGTH+com_pkt_info.forward_pkt_len,com_pkt_info.backward_pkt_len);
-    memset(back_pkt+PACKET_HEADER_LENGTH-ERROR_MEMO_LENGTH,' ',ERROR_MEMO_LENGTH);
-    memcpy(backward_pkt, back_pkt,strlen(back_pkt));
-
-    free(back_pkt);
-    back_pkt = NULL;
-
+    
     return 1;
 }
 

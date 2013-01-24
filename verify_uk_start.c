@@ -30,7 +30,7 @@ int Init_verify_uk_server(void)
 	int welcome_sd_trans = 0;	/* socket for normal transaction packets from clients */
 	struct sockaddr_in sa_trans;
 
-	int welcome_sd_update_server_pub_key = 0; /*socket for updating server public key*/
+	//int welcome_sd_update_server_pub_key = 0; /*socket for updating server public key*/
 
 
 	/* pid for the daemon process management */
@@ -126,7 +126,7 @@ int Init_verify_uk_server(void)
         OUTPUT_ERROR;
         return -1;
     } else if (0 == pid_daemon_trans) {
-        ret  = Do_verify_procedures(welcome_sd_trans,&sa_trans);
+        ret  = Daemon_db_verify_uk_server(welcome_sd_trans,&sa_trans);
         if (-1== ret) {
             LOG(ERROR)<<"[Daemon__trans_server, !Failed]";
             exit(0);
@@ -187,7 +187,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
     len = sizeof (struct sockaddr);
 
     assert(0<welcome_sd);
-    assert(NULL!=sa_business);
+    assert(NULL!=sa);
 
     /* Enter the Daemon */
     while (1) {
@@ -239,7 +239,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             }
 
             /* BUSINESS:Receiving data from business servers*/
-            count = multi_recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
+            count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
             LOG(INFO)<<"Verify UK: Recv data from Terminal.";
             LOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
             DBG("\n%s:|%s|\n","Verify UK: Recv data from Terminal",buf_recv);
@@ -257,8 +257,8 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             }
 
             /* Deal with the packet in the following function, there is a function
-             * to send the result to the business machines. */
-            ret  = Do_verify_procedures(connection_sd,packet,count);
+             		* to send the result to the business machines. */
+            ret  = Do_verify_procedures(connection_sd, packet, count);
 
 END:
             close(connection_sd);

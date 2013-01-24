@@ -9,7 +9,7 @@
 #ifndef MULTI_RECVSEND_H
 #define MULTI_RECVSEND_H
 
-#include "common.h"
+#define SOCKET_MAXPACKETSIZE 400000
 
 int multi_recv(int socket_fd, char *buf_recv, size_t recv_len, int flags);
 int multi_send(int socket_fd, const char *buf_send, size_t send_len, int flags);

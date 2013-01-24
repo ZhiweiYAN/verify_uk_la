@@ -314,7 +314,11 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
     RSA_blinding_on(receiver_pub_private_key_for_decrypt, tctx);
     for (ctlen = i = 0;  i < cipher_text_len / RSA_size(receiver_pub_private_key_for_decrypt);  i++) {
         if (!(l = RSA_private_decrypt(RSA_size(receiver_pub_private_key_for_decrypt), cipher_text, p, receiver_pub_private_key_for_decrypt,
-                                      padding_mode))) goto err;
+                                      padding_mode))) 
+                                      { 
+                                      	ret = -3;
+                                      	goto err;
+        	}
         cipher_text += RSA_size(receiver_pub_private_key_for_decrypt);
         p += l;
         ctlen += l;
@@ -358,7 +362,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         sig, RSA_size(signers_pub_key_for_signature),
                     signers_pub_key_for_signature)) {
         LOG(ERROR)<<"RSA verify, failed";
-        ret = -1;
+        ret = -5;
         goto err;
     }
 
@@ -376,13 +380,13 @@ err:
         sig = NULL;
     }
 
-    if(-1==ret ){
+    if( 1!=ret ){
         if(NULL!=(*plain_text)){
             free( (*plain_text));
             *plain_text = NULL;
             *plain_text_len = 0;
         }
-        return -1;
+        return ret;
     }
     else{
         return 1;
