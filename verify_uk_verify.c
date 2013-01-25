@@ -34,6 +34,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     unsigned char *cipher_text = NULL;
     unsigned int   cipher_text_len = 0;
+
     unsigned char *to_proxy_plain_text = NULL;
     unsigned int   to_proxy_plain_text_len = 0;
 
@@ -41,8 +42,8 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     unsigned int 	from_proxy_plain_text_len = 0;
 
     VerifyPacketHeader veri_pkt_hdr;
-    RSA terminal_pub_key;
-    RSA server_private_key;
+    RSA *terminal_pub_key = NULL;
+    RSA *server_private_key = NULL;
 
     bzero(send_terminal, MAXPACKETSIZE);
 
@@ -55,29 +56,28 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         LOG(ERROR)<<"Parse verify pkt header, error.";
         OUTPUT_ERROR;
         ret = PrepareErrorResPacket(send_terminal, ERROR_INCOMPLETE_PKT);
-
         send_terminal_len = strlen(send_terminal);
         goto Do_verify_procedures_END;
     }
 
     //get the public key of terminal
-    ret = Get_terminal_pub_key(&terminal_pub_key, &veri_pkt_hdr);
+//    ret = Get_terminal_pub_key(&terminal_pub_key, &veri_pkt_hdr);
+    ret = Get_terminal_pub_key_from_file(&terminal_pub_key);
     if (-1==ret) {
-        LOG(ERROR)<<"pub_key_of_the_terminal_id, found nothing on server side, error.";
+        LOG(ERROR)<<"pub_key_of_the_terminal_id, while finding on server side, error.";
         OUTPUT_ERROR;
         ret = PrepareErrorResPacket(send_terminal, ERROR_NO_TERMINAL_RSA_PUBKEY);
-
         send_terminal_len = strlen(send_terminal);
         goto Do_verify_procedures_END;
     }
 
     //get the private key of verify server
-    ret = Get_server_private_key(&server_private_key);
+//    ret = Get_server_private_key(&server_private_key);
+    ret = Get_server_private_key_from_file(&server_private_key);
     if (-1==ret) {
         LOG(ERROR)<<"while finding private key of server, nothing on server side, error.";
         OUTPUT_ERROR;
         ret = PrepareErrorResPacket(send_terminal, ERROR_NO_SRV_RSA_PRIKEY);
-
         send_terminal_len = strlen(send_terminal);
         goto Do_verify_procedures_END;
     }
@@ -92,17 +92,16 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     memcpy(send_terminal, packet, pre_pkt_len);
 
     //malloc? free?
-    ret = decrypt_and_validate_sign(&server_private_key, &terminal_pub_key,
+    ret = decrypt_and_validate_sign(server_private_key, terminal_pub_key,
                                     cipher_text, cipher_text_len,
                                     &to_proxy_plain_text, &to_proxy_plain_text_len);
 
 
-    if(1>to_proxy_plain_text_len || 1!=ret) {
+    if(1!=ret) {
         if(ERROR_DECRYPT==ret) {
             LOG(ERROR)<<"while decrypting cipher text, error.";
             OUTPUT_ERROR;
             PrepareErrorResPacket(send_terminal, ERROR_DECRYPT);
-
             send_terminal_len = strlen(send_terminal);
             goto Do_verify_procedures_END;
         }
@@ -118,7 +117,6 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
             LOG(ERROR)<<"while decrypting cipher text and validating the signatures, error.";
             OUTPUT_ERROR;
             PrepareErrorResPacket(send_terminal, ERROR_VALIDATE_SIGN);
-
             send_terminal_len = strlen(send_terminal);
             goto Do_verify_procedures_END;
         }
@@ -129,11 +127,9 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         LOG(ERROR)<<"memory malloc, failed.";
         OUTPUT_ERROR;
         PrepareErrorResPacket(send_terminal, ERROR_MEMORY_LACK);
-
         send_terminal_len = strlen(send_terminal);
         goto Do_verify_procedures_END;
     }
-
 
     bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
 
@@ -145,7 +141,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     if(1==ret) {
 
         bzero(send_terminal, MAXPACKETSIZE);
-        ret = Sign_and_encrypt_plain_text(&server_private_key, &terminal_pub_key,
+        ret = Sign_and_encrypt_plain_text(server_private_key, terminal_pub_key,
                                           (unsigned char *) from_proxy_plain_text,
                                           (unsigned int) from_proxy_plain_text_len,
                                           (unsigned char * *) &send_terminal_cipher_text,
@@ -173,6 +169,8 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         goto Do_verify_procedures_END;
     }
 
+    RSA_free(terminal_pub_key);
+    RSA_free(server_private_key);
 
 
 
@@ -254,7 +252,7 @@ int PrepareErrorResPacket(char *pkt, int error_code)
     case ERROR_MEMORY_LACK:
         strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "7", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "server memory, lack!",
+                "server memory, not enough!",
                 VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
         break;
 
@@ -296,7 +294,30 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     memcpy(pkt_header->rsp_memo_txt, pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
     memcpy(&(pkt_header->payload_len), pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
 
-    return 1;
+	DBG("Pay load bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
+	if(pkt_header->payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
+        return 1;
+    } else {
+        return -1;
+    }
+
+}
+
+int Get_terminal_pub_key_from_file(RSA **terminal_pub_key)
+{
+    int ret = 0;
+
+    RSA * pub_key = NULL;
+
+    ret =  Generate_pub_key_from_files((char*)PUB_KEY_BARE_BIN_FILE_NAME, &pub_key);
+    if(-1==ret) {
+        *terminal_pub_key = NULL;
+        return -1;
+    } else {
+        *terminal_pub_key = pub_key;
+        return 1;
+    }
+
 
 }
 
@@ -304,6 +325,7 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
 int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
 {
 
+    int ret = 0;
     PGconn* conn_db = NULL;
     char * results_string = NULL;
     int  results_string_len = 0;
@@ -341,16 +363,18 @@ int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
     }
 
     //generate query string
-    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where index_id=\"%s%s\";",
-            (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id ));
+    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\';",
+            (char*)(pkt_header->terminal_id) );
 
+//    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\'";",
+    //          (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id ));
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
-    DBG("\n%s |%s|\n","Record: SQL string", query_string);
-    LOG(INFO)<<"Record: SQL string: "<<query_string;
+    DBG("\n%s |%s|\n","Query: SQL string", query_string);
+    LOG(INFO)<<"Query: SQL string: "<<query_string;
 
     /* Did the record action fail in the primary database? */
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         OUTPUT_ERROR;
         perror(query_string);
         perror(PQerrorMessage(conn_db));
@@ -372,8 +396,15 @@ int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
 
         pub_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
 
+//		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
+
         if(NULL!=pub_key_bin_buffer) {
-            key = DER_decode_RSA_public((unsigned char*)pub_key_bin_buffer, KEY_SIZE);
+            key = Convert_der_to_rsa_for_pub_key((unsigned char*)pub_key_bin_buffer, PUB_KEY_DER_LEN);
+            if(NULL==key) {
+                DBG("DER TO RSA, Error");
+                LOG(ERROR)<<"Terminal pubkey DER TO RSA, Error.";
+                ret = -1;
+            }
         }
     }
 
@@ -391,16 +422,32 @@ int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
     PQfinish((PGconn*)(conn_db));
     conn_db = NULL;
 
-    return 1;
+    return ret;
 
 }
 
 int Get_server_private_key(RSA *server_private_key)
 {
     int ret = 0;
-    server_private_key = Get_private_key_from_file(server_private_key, (char *)"pri_keyfile.txt");
     return ret;
 }
+
+int Get_server_private_key_from_file(RSA **server_private_key)
+{
+    int ret = 0;
+    RSA *key = NULL;
+
+    ret = Get_private_key_from_file(&key, (char *)"./openssl/pri_keyfile.txt");
+    if(1==ret) {
+        *server_private_key = key;
+        return 1;
+    } else {
+        *server_private_key = NULL;
+        return -1;
+    }
+
+}
+
 
 /*
  * ===  FUNCTION  ======================================================================
@@ -415,12 +462,6 @@ int Record_pkt_regular_table( char *pkt, int pkt_size,
     return 1;
 }
 
-
-int Get_back_pkt_for_business_srv(char *pkt,int pkt_size, char* backward_pkt)
-{
-
-    return 1;
-}
 
 
 PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip_addr)

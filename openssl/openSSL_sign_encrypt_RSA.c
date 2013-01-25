@@ -17,6 +17,42 @@
  */
 #include "openSSL_sign_encrypt_RSA.h"
 
+int Generate_pub_key_from_files(char* file_name, RSA** rsa)
+{
+    char prefix_pub_key[PRIFIX_PUB_KEY_LEN]= {0x30,0x81,0x89,0x02,0x81,0x81,0x00};
+    char subfix_pub_key[SUBFIX_PUB_KEY_LEN]= {0x02,0x03,0x01,0x00,0x01 };
+
+    char buf[PUB_KEY_DER_FORMAT_LEN+1];
+    bzero(buf, PUB_KEY_DER_FORMAT_LEN+1);
+
+    FILE *fp = NULL;
+    fp = fopen(file_name,"rb");
+    if(NULL==fp) {
+        return -1;
+    }
+
+    memcpy(buf, prefix_pub_key, PRIFIX_PUB_KEY_LEN);
+    fread(buf + PRIFIX_PUB_KEY_LEN, PUB_KEY_BARE_LEN, 1, fp);
+    memcpy(buf + PRIFIX_PUB_KEY_LEN + PUB_KEY_BARE_LEN, subfix_pub_key, SUBFIX_PUB_KEY_LEN);
+
+    fclose(fp);
+    fp = NULL;
+
+    RSA *rsa_pub_key = NULL;
+
+    const unsigned char *p_buf = (const unsigned char *)buf;
+    rsa_pub_key = d2i_RSAPublicKey (NULL, &p_buf, PUB_KEY_DER_FORMAT_LEN);
+
+    if(NULL==rsa_pub_key) {
+        //ERR_print_errors_fp(stdout);
+        *rsa = NULL;
+        return -1;
+    } else {
+        *rsa = rsa_pub_key;
+        return 1;
+    }
+}
+
 char *base64(const unsigned char *input, int length)
 {
     BIO *bmem, *b64;
@@ -59,7 +95,7 @@ char *unbase64(unsigned char *input, int length)
 /* Returns the malloc'd buffer, and puts the size of the buffer into the integer
  * pointed to by the second argument.
  */
-unsigned char *DER_encode_RSA_public(RSA *rsa, int *len)
+unsigned char *Convert_rsa_to_der_for_pub_key(RSA *rsa, int *len)
 {
     unsigned char *buf, *next;
 
@@ -75,9 +111,9 @@ unsigned char *DER_encode_RSA_public(RSA *rsa, int *len)
  * d2i_... changes its value, those changes aren't reflected in the caller's copy
  * of the pointer.
  */
-RSA *DER_decode_RSA_public(unsigned char *buf, long len)
+RSA *Convert_der_to_rsa_for_pub_key(unsigned char *buf, long len)
 {
-    return d2i_RSAPublicKey(0, ( const unsigned char**)&buf, len);
+    return d2i_RSAPublicKey(NULL, ( const unsigned char**)&buf, len);
 }
 
 
@@ -107,21 +143,26 @@ int Save_private_key_to_file(RSA *rsa, char* key_file)
 }
 
 
-RSA* Get_private_key_from_file(RSA *rsa, char* key_file)
+int Get_private_key_from_file(RSA **rsa, char* key_file)
 {
     FILE *file;
-    if (NULL == rsa) {
-        printf("RSA not initial!\n");
-        return NULL;
-    }
     file = fopen(key_file, "rb");
     if (NULL == file) {
         printf("open file 'prikey.key' failed!\n");
-        return NULL;
+        return -1;
     }
-    PEM_read_RSAPrivateKey(file, &rsa, NULL, NULL);
+
+    RSA *key = NULL;
+    PEM_read_RSAPrivateKey(file, &key, NULL, NULL);
     fclose(file);
-    return rsa;
+
+    if(NULL==key) {
+        *rsa = NULL;
+        return 1;
+    } else {
+        *rsa = key;
+        return 1;
+    }
 }
 
 
@@ -296,6 +337,7 @@ int Sign_and_encrypt_plain_text(RSA *receiver_pub_key_for_encrypt,
     } else {
         padding_mode = RSA_PKCS1_PADDING;
     }
+	padding_mode = RSA_PKCS1_PADDING;
 
     while (bytes_remaining > 0) {
         /* encrypt b_per_ct bytes up until the last loop, where it may be fewer. */
@@ -354,7 +396,8 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 {
     int           ret = 0;
     BN_CTX        *tctx = NULL;
-    unsigned int  ctlen =0, i=0, l=0;
+    unsigned int  ctlen =0, i=0;
+	int  l=0;
     unsigned char *decrypt=NULL,  *p=NULL;
 
     unsigned char *sig = NULL;
@@ -399,17 +442,27 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         padding_mode = RSA_PKCS1_PADDING;
     }
 
+	padding_mode = RSA_NO_PADDING;
+
+	ctlen = 0;
     RSA_blinding_on(receiver_pub_private_key_for_decrypt, tctx);
-    for (ctlen = i = 0;  i < cipher_text_len / RSA_size(receiver_pub_private_key_for_decrypt);  i++) {
-        if (!(l = RSA_private_decrypt(RSA_size(receiver_pub_private_key_for_decrypt), cipher_text, p, receiver_pub_private_key_for_decrypt,
-                                      padding_mode))) {
-            ret = -3;
-            goto err;
-        }
+    for (i = 0;  i < cipher_text_len / RSA_size(receiver_pub_private_key_for_decrypt);  i++) {
+        l = RSA_private_decrypt(RSA_size(receiver_pub_private_key_for_decrypt), 
+			cipher_text, p, receiver_pub_private_key_for_decrypt,
+                                      padding_mode);
+		if(-1==l){
+			char buf[2048];
+			 ERR_load_crypto_strings();
+			ERR_error_string(ERR_get_error(), buf);
+			fprintf(stderr, "%s\n", buf);
+			 goto err;
+			}
         cipher_text += RSA_size(receiver_pub_private_key_for_decrypt);
         p += l;
         ctlen += l;
     }
+
+	printf("ctlen: %d.\n", ctlen);
 
     //split the signature text and plain text
     sig_len = RSA_size(signers_pub_key_for_signature);
@@ -426,6 +479,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 
 
     *plain_text_len = ctlen - sig_len;
+	printf("*plain_text_len: %d.", *plain_text_len);
     *plain_text = (unsigned char *)malloc(*plain_text_len);
     if(NULL==*plain_text) {
         LOG(ERROR)<<"malloc, failed";

@@ -19,20 +19,18 @@
 int Do_verify_procedures(int connection_sd,char *packet,int packet_size);
 
 int PrepareErrorResPacket(char *pkt, int error_code);
-
 int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_header);
+
 int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header);
 int Get_server_private_key(RSA *server_private_key);
+
+int Get_terminal_pub_key_from_file(RSA **terminal_pub_key);
+int Get_server_private_key_from_file(RSA **server_private_key);
+
+
 PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip_addr);
 
 
-
-int Get_terminal_key_of_verify_server(RSA *key, VerifyPacketHeader *pkt_header);
-
-int Get_server_private_key(RSA *server_private_key);
-
 int Record_pkt_regular_table( char *pkt, int pkt_size,PGconn *conn_db, char* backward_pkt);
-int Get_back_pkt_for_business_srv(char *pkt,int pkt_size, char* backward_pkt);
-
 
 #endif   /* ----- #ifndef VERIFY_UK_VERIFY_H_INC  ----- */
