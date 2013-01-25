@@ -2,10 +2,10 @@
  * File name:
  * 		verify_uk_comm_proxy.h
  * Description:
- * 		The program is run at the primary database server.
- * 		It receives the data request packet from Slave database.
+ * 		The program is run at the verify server.
+ * 		It sends receives the data from proxy server.
  * Author:
- * 		Zhiwei Yan, jero.yan@gmail.com
+ * 		Zhiwei Yan, jerod.yan@gmail.com
  * Date:
  *      2013-01-24
  * *************************************************/

@@ -30,14 +30,8 @@ int Init_verify_uk_server(void)
     int welcome_sd_trans = 0;	/* socket for normal transaction packets from clients */
     struct sockaddr_in sa_trans;
 
-    //int welcome_sd_update_server_pub_key = 0; /*socket for updating server public key*/
-
-
     /* pid for the daemon process management */
     pid_t pid_daemon_trans = 0;
-
-    LOG(INFO)<<"================ Initialization Step I =====================";
-    printf("\n================ Initialization Step I =====================\n");
 
     /* Read parameters from the configuration files. */
     ret  = Setup_config_parameters();
@@ -133,41 +127,7 @@ int Init_verify_uk_server(void)
         };
     }
 
-    LOG(INFO)<<"================ Initialization Step II =====================";
-    printf("\n================ Initialization Step II =====================\n");
-
-
-    /*
-        LOG(INFO)<<"================ Initialization Step III =====================";
-        printf("\n================ Initialization Step III =====================\n");
-        ret  = Test_connection_db_server(global_par.system_par.database_user[0],
-                                         global_par.system_par.database_password[0],
-                                         global_par.system_par.database_name,
-                                         global_par.system_par.localhost_ip_address);
-        LOG(INFO)<<"Testing OWNSELF DB connections:";
-        printf("Testing OWNSELF DB connections:");
-        if (-1 == ret ) {
-            LOG(ERROR)<<"[!Failed]";
-            LOG(ERROR)<<"Detail: "
-                      <<global_par.system_par.database_user[0]
-                      <<global_par.system_par.database_password[0]
-                      <<global_par.system_par.database_name
-                      <<global_par.system_par.verify_ip_addr_array[0];
-            OUTPUT_ERROR;
-            return -1;
-        } else {
-            ret  = Set_ownself_server_mode(READY);
-            LOG(INFO)<<"[Success!]";
-            OUTPUT_OK;
-        }
-
-    */
-
-
-
-    /* Function END */
     return 1;
-
 }
 
 
@@ -193,7 +153,6 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
     while (1) {
 
         printf("\r\033[32mThe Verify UK Daemon Process is waiting for connections .... \033[0m\n");
-        LOG(INFO)<<"The Verify UK Daemon Process is waiting for connections .... ";
 
         if (( connection_sd = accept(welcome_sd,(struct sockaddr*)sa,&len))<0) {
             LOG(ERROR)<< "Error happens when socket function <accept> is running. We will close the socket at once and delay 2 ms and restart.";
@@ -202,11 +161,11 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             sleep(2);
             continue;
         }
+        printf("\r\033[32mA connection has arrived.\033[0m\n");
 
-
-//	create a seperate process to monitor the process table.
+        //	create a seperate process to monitor the process table.
         if ((pid = fork()) < 0) {
-            LOG(ERROR)<<"1st fork() db record, failed";
+            LOG(ERROR)<<"1st fork() verify server, failed";
             OUTPUT_ERROR;
             close(connection_sd);
             return -1;
@@ -217,7 +176,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             close(welcome_sd);
 
             if ((pid = fork()) < 0) {
-                LOG(ERROR)<<"2nd fork() db record, failed";
+                LOG(ERROR)<<"2nd fork() verify server, failed";
                 OUTPUT_ERROR;
                 return -1;
             } else if (pid > 0)
@@ -245,7 +204,6 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             LOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
             DBG("\n%s:|%s|\n","Verify UK: Recv data from Terminal",buf_recv);
 
-
             /* Prepare the actual memory for the packet */
             packet = (char *)malloc(sizeof(char)*(count+1));
             if (NULL == packet) {
@@ -258,7 +216,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             }
 
             /* Deal with the packet in the following function, there is a function
-             		* to send the result to the business machines. */
+            to send the result to the business machines. */
             ret  = Do_verify_procedures(connection_sd, packet, count);
 
 END:

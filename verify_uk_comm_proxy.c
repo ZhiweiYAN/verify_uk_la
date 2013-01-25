@@ -2,7 +2,7 @@
  * File name:
  * 		verify_uk_comm_proxy.cc
  * Description:
- * 		The program is run at the primary database server.
+ * 		The program is run at the verify server.
  * Author:
  * 		Zhiwei Yan, jerod.yan@gmail.com
  * Date:
@@ -12,33 +12,29 @@
 /* *************************************************
 * Function Name:
 * 		int SendRecv_message_to_proxy(char *msg_to_proxy, int msg_to_proxy_length)
-* Input:
-* 		NONE;
-* Ouput:
-* 		1 ---> success
-* 		-1 ---> failure
 * *************************************************/
 int SendRecv_message_to_proxy(char *msg_to_proxy,
                               int msg_to_proxy_length,
                               char*msg_from_proxy,
                               int *msg_from_proxy_len)
 {
-    /*variable for proxy*/
+    int success = 0;
+
+    int count = 0;
+
     int i = 0;
     int proxy_sd;/*socket for proxy*/
     struct sockaddr_in proxy_sa;/* information for proxy*/
 
+    int proxy_srv_num = 0;
     char proxy_address_array[MAX_PROXY_NUMBER][16];
     int proxy_data_port = 0;
-    int success = 0;
 
-    //long int n = 0;
     time_t t = 0;
-    int proxy_srv_num = 0;
 
     /* Get proxy address and communication with proxy */
 
-    //Random one proxy
+    //choose the idx of a proxy server at random
     t = time(NULL);
     srand((unsigned int) t);
     proxy_srv_num = global_par.system_par.proxy_number;
@@ -50,10 +46,11 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
 
     }
 
+    //read the proxy server ips and data port from the global configration
     success = Read_proxy_parameters((char*)(proxy_address_array),&proxy_data_port);
     if ((proxy_sd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("error:@verify_db_comm_proxy.cc:Send_message_to_proxy() socket ");
-        LOG(ERROR)<<"socket initialization in Send_message_to_proxy, failed.";
+        LOG(ERROR)<<"socket initialization in SendRecv_message_to_proxy, failed.";
         return -1;
     }
 
@@ -61,12 +58,13 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
     bzero(&proxy_sa, sizeof(proxy_sa));
     proxy_sa.sin_family = AF_INET;
     proxy_sa.sin_port = htons(proxy_data_port);
-    //	proxy_sa.sin_addr.s_addr = inet_addr(proxy_address_array[i]);
     proxy_sa.sin_addr.s_addr = inet_addr(global_par.system_par.proxy_ip_addr_array[i]);
+
     /*connect to proxy*/
     if (connect(proxy_sd, (struct sockaddr*)&proxy_sa, sizeof(proxy_sa)) < 0) {
         perror("error:@verify_db_comm_proxy.cc:Send_message_to_proxy()02");
-        LOG(ERROR)<<"failed to connect proxy server "<< global_par.system_par.proxy_ip_addr_array[i]
+        LOG(ERROR)<<"failed to connect proxy server "
+                  << global_par.system_par.proxy_ip_addr_array[i]
                   <<":"<<proxy_data_port;
         close(proxy_sd);
         return -1;
@@ -74,25 +72,32 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
 
     LOG(INFO)<<"successfully connect to proxy server" << global_par.system_par.proxy_ip_addr_array[i]
              <<":" <<proxy_data_port;
+
     /* Send the message */
-    if (send(proxy_sd, msg_to_proxy, msg_to_proxy_length, 0) < 0) {
+    count = send(proxy_sd, msg_to_proxy, msg_to_proxy_length, 0);
+    if (count < 0) {
         perror("error:@verify_db_comm_proxy.cc:Send_message_to_proxy()03");
         LOG(ERROR)<<"failed to send msg_to_proxy to proxy server: "<< msg_to_proxy;
         close(proxy_sd);
         return -1;
+    } else {
+        DBG("send to proxy %d bytes: |%s|\n", count, msg_to_proxy);
     }
-    /* Recv a message */
 
-    *msg_from_proxy_len=recv(proxy_sd, msg_from_proxy, MAX_SIZE_BUFFER_RECV, 0);
-    if (*msg_from_proxy_len < 0) {
+    /* Recv a message */
+    count=recv(proxy_sd, msg_from_proxy, MAX_SIZE_BUFFER_RECV, 0);
+    if (count < 0) {
         perror("error:@verify_db_comm_proxy.cc:Send_message_to_proxy()04");
         *msg_from_proxy_len = 0;
         close(proxy_sd);
         return -1;
+    } else {
+        DBG("recv from proxy %d bytes: |%s|\n", count, msg_from_proxy);
+        *msg_from_proxy_len = count;
+        LOG(INFO)<<"successfully recv msg from proxy server:" << msg_from_proxy;
     }
 
     close(proxy_sd);
-    LOG(INFO)<<"successfully recv msg from proxy server:" << msg_from_proxy;
     return 1;
 }
 
