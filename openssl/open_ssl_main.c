@@ -17,6 +17,10 @@ int main(void)
 
     int ret = 0;
 
+    google::SetLogDestination(google::INFO,("./log.txt"));
+    google::InitGoogleLogging("");
+
+    /*
     char results_string[]="MIGMAgEAAoGBAJ+c9JmFU7ctJ4NKcv4AcUYnxzXZoy5X2/whN5DuxordXLndsFMd+37fT2xB5RdJIGP9aPLm9BLvPmj9BAjJEQxDDbX4jExQ/PD4O1+0a3iqJRt5zY3ryLlJAADET9bnhMNR2L36BXEcClGGDy+jVJMyhrFNkeR2bLxHmzyeaetfAgMBAAE=";
     char *pub_key_der_buffer = NULL;
 
@@ -54,7 +58,9 @@ int main(void)
     ret = Generate_pub_key_from_files("terminal_pub_key.dat", &key);
 
     return 1;
+    */
 
+    /*
     //Google Log
     google::SetLogDestination(google::INFO,("./log.txt"));
     google::InitGoogleLogging("");
@@ -107,15 +113,15 @@ int main(void)
 
     return 1;
 
-
+    */
 
     //Generate public key and private key, which are stored in an RSA object.
+    RSA *rsa = NULL;
     unsigned long exp =  RSA_F4; //65537
     rsa = RSA_generate_key(KEY_SIZE, exp, callback, NULL);
     ret = Save_private_key_to_file(rsa, (char *)"pri_keyfile.txt");
 
-
-    Remove_private_key(rsa);
+    //Remove_private_key(rsa);
 
     ret = Save_private_key_to_file(rsa, (char *)"pub_keyfile.txt");
 
@@ -137,8 +143,8 @@ int main(void)
                                     cipher_text, cipher_text_len,
                                     &plain_text, &plain_text_len);
 
-    DLOG(INFO) <<"DLOG END.";
-    LOG(INFO)  <<  "END LOG.";
+    //DLOG(INFO) <<"DLOG END.";
+    //LOG(INFO)  <<  "END LOG.";
     google::ShutdownGoogleLogging();
 
     return ret;

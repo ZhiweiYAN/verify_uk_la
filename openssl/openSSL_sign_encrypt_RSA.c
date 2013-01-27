@@ -22,7 +22,8 @@ int Generate_pub_key_from_files(char* file_name, RSA** rsa)
     char prefix_pub_key[PRIFIX_PUB_KEY_LEN]= {0x30,0x81,0x89,0x02,0x81,0x81,0x00};
     char subfix_pub_key[SUBFIX_PUB_KEY_LEN]= {0x02,0x03,0x01,0x00,0x01 };
 
-    char buf[PUB_KEY_DER_FORMAT_LEN+1];
+    char *buf = NULL;
+	buf = (char*)malloc(PUB_KEY_DER_FORMAT_LEN+1);
     bzero(buf, PUB_KEY_DER_FORMAT_LEN+1);
 
     FILE *fp = NULL;
@@ -31,17 +32,22 @@ int Generate_pub_key_from_files(char* file_name, RSA** rsa)
         return -1;
     }
 
+	char *p = NULL;
+	p = buf;
     memcpy(buf, prefix_pub_key, PRIFIX_PUB_KEY_LEN);
-    fread(buf + PRIFIX_PUB_KEY_LEN, PUB_KEY_BARE_LEN, 1, fp);
     memcpy(buf + PRIFIX_PUB_KEY_LEN + PUB_KEY_BARE_LEN, subfix_pub_key, SUBFIX_PUB_KEY_LEN);
+    fread(buf + PRIFIX_PUB_KEY_LEN, PUB_KEY_BARE_LEN, 1, fp);
 
     fclose(fp);
     fp = NULL;
+	buf = p;
 
     RSA *rsa_pub_key = NULL;
 
     const unsigned char *p_buf = (const unsigned char *)buf;
     rsa_pub_key = d2i_RSAPublicKey (NULL, &p_buf, PUB_KEY_DER_FORMAT_LEN);
+
+	LOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
 
     if(NULL==rsa_pub_key) {
         //ERR_print_errors_fp(stdout);
@@ -249,7 +255,7 @@ int Sign_and_encrypt_plain_text(RSA *receiver_pub_key_for_encrypt,
     DLOG(INFO)<<"input, plain_text_len: "<<plain_text_len;
     DLOG(INFO)<<"input, plain_text: |"<<plain_text<<"|";
 
-//we put the plain text into a temporary buffer.
+    //we put the plain text into a temporary buffer.
     len = plain_text_len;
     tmp = (unsigned char *)malloc(len);
     if(NULL==tmp) {
@@ -332,12 +338,14 @@ int Sign_and_encrypt_plain_text(RSA *receiver_pub_key_for_encrypt,
     memcpy(to_encrypt + sig_len, plain_text, plain_text_len);
     p = *cipher_text;
 
-    if(RSA_PKCS1_OAEP_PADDING == RSA_PKCS_PADDING_MODE) {
+    /*
+    if(RSA_PKCS1_OAEP_PADDING == RSA_PKCS_PADDING_MODE){
         padding_mode = RSA_PKCS1_OAEP_PADDING;
-    } else {
+    }else{
         padding_mode = RSA_PKCS1_PADDING;
     }
-	padding_mode = RSA_PKCS1_PADDING;
+    */
+    padding_mode = RSA_PKCS_PADDING_MODE;
 
     while (bytes_remaining > 0) {
         /* encrypt b_per_ct bytes up until the last loop, where it may be fewer. */
@@ -396,16 +404,15 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 {
     int           ret = 0;
     BN_CTX        *tctx = NULL;
-    unsigned int  ctlen =0, i=0;
-	int  l=0;
+    unsigned int  ctlen =0, i=0, l=0;
     unsigned char *decrypt=NULL,  *p=NULL;
 
     unsigned char *sig = NULL;
     int sig_len = 0;
     int padding_mode = 0;
 
-    unsigned char hash[SHA1_LEN];
-    memset(hash, 0, SHA1_LEN);
+    unsigned char hash[SHA1_LEN +1];
+    memset(hash, 0, SHA1_LEN+1);
 
     DLOG(INFO)<<"cipher_text_len:"<<cipher_text_len<<hex2str(cipher_text,cipher_text_len);
 
@@ -442,27 +449,24 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         padding_mode = RSA_PKCS1_PADDING;
     }
 
-	padding_mode = RSA_NO_PADDING;
+    padding_mode = RSA_PKCS_PADDING_MODE;
 
-	ctlen = 0;
     RSA_blinding_on(receiver_pub_private_key_for_decrypt, tctx);
-    for (i = 0;  i < cipher_text_len / RSA_size(receiver_pub_private_key_for_decrypt);  i++) {
-        l = RSA_private_decrypt(RSA_size(receiver_pub_private_key_for_decrypt), 
-			cipher_text, p, receiver_pub_private_key_for_decrypt,
-                                      padding_mode);
-		if(-1==l){
-			char buf[2048];
-			 ERR_load_crypto_strings();
-			ERR_error_string(ERR_get_error(), buf);
-			fprintf(stderr, "%s\n", buf);
-			 goto err;
-			}
+    for (ctlen = i = 0;  i < cipher_text_len / RSA_size(receiver_pub_private_key_for_decrypt);  i++) {
+        if (!(l = RSA_private_decrypt(RSA_size(receiver_pub_private_key_for_decrypt), cipher_text, p, receiver_pub_private_key_for_decrypt,
+                                      padding_mode))) {
+            char buf[2048];
+            ERR_load_crypto_strings();
+            ERR_error_string(ERR_get_error(), buf);
+            fprintf(stderr, "%s\n", buf);
+            DLOG(INFO)<<"decrypt error info:"<<buf;
+            ret = -1;
+            goto err;
+        }
         cipher_text += RSA_size(receiver_pub_private_key_for_decrypt);
         p += l;
         ctlen += l;
     }
-
-	printf("ctlen: %d.\n", ctlen);
 
     //split the signature text and plain text
     sig_len = RSA_size(signers_pub_key_for_signature);
@@ -479,16 +483,13 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 
 
     *plain_text_len = ctlen - sig_len;
-	printf("*plain_text_len: %d.", *plain_text_len);
     *plain_text = (unsigned char *)malloc(*plain_text_len);
     if(NULL==*plain_text) {
         LOG(ERROR)<<"malloc, failed";
         ret = -1;
         goto err;
     } else {
-        // memcpy(*plain_text, decrypt, ctlen-sig_len);
-        memcpy(*plain_text, decrypt+sig_len, ctlen-sig_len);
-        // DLOG(INFO)<<"plain_text_len:"<<*plain_text_len<<hex2str(*plain_text, *plain_text_len);
+        memcpy(*plain_text, decrypt+sig_len,  *plain_text_len);
         DLOG(INFO)<<"output, plain_text_len: "<<*plain_text_len;
         DLOG(INFO)<<"output, plain_text: |"<<*plain_text <<"|";
     }
@@ -498,14 +499,40 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         goto err;
     }
 
-    //verify the signature of signer.
-    if (!RSA_verify(NID_sha1, hash, SHA1_LEN,
-                    sig, RSA_size(signers_pub_key_for_signature),
-                    signers_pub_key_for_signature)) {
-        LOG(ERROR)<<"RSA verify, failed";
-        ret = -5;
+//    //verify the signature of signer.
+//	ret = RSA_verify(NID_sha1, hash, SHA1_LEN, sig, RSA_size(signers_pub_key_for_signature), signers_pub_key_for_signature);
+//  
+//    if (1!=ret){
+//        LOG(ERROR)<<"RSA verify, failed";
+//		print_rsa_error_string();
+//        ret = -1;
+//       goto err;
+//    }
+   
+
+	//decrypt signature with pubkey_terminal, comparing to sha1 of plain txt byte to byte.
+	unsigned char sig_decrypt[SHA1_LEN];
+	memset(sig_decrypt, 0, SHA1_LEN);
+
+	ret = RSA_public_decrypt(RSA_size(signers_pub_key_for_signature), 
+		sig, sig_decrypt, signers_pub_key_for_signature, padding_mode);
+
+	if(-1==ret){
         goto err;
     }
+    else{
+		DLOG(INFO)<<hex2str(sig_decrypt,SHA1_LEN)<<"signature txt:" ;
+		DLOG(INFO)<<hex2str(hash, SHA1_LEN)<<"recv signature txt:";
+	}
+    
+    ret = memcmp(hash,sig_decrypt, SHA1_LEN);
+
+    if(0==ret){
+        ret = 1;
+    }else{
+        ret = -1;
+    } 
+    
 
 err:
     RSA_blinding_off(receiver_pub_private_key_for_decrypt);
@@ -521,15 +548,25 @@ err:
         sig = NULL;
     }
 
-    if( 1!=ret ) {
+    if(-1==ret ) {
         if(NULL!=(*plain_text)) {
             free( (*plain_text));
             *plain_text = NULL;
             *plain_text_len = 0;
         }
-        return ret;
+        return -1;
     } else {
         return 1;
     }
+}
+
+int print_rsa_error_string(void)
+{
+    char buf[2048];
+    ERR_load_crypto_strings();
+    ERR_error_string(ERR_get_error(), buf);
+    fprintf(stderr, "%s\n", buf);
+    DLOG(INFO)<<"decrypt error info:"<<buf;
+    return 1;
 }
 

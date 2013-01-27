@@ -47,7 +47,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     bzero(send_terminal, MAXPACKETSIZE);
 
-    //sleep(30);
+    sleep(45);
 
     //get verifing-packet header and parse the verifing-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
@@ -88,7 +88,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     to_proxy_plain_text_len = 0;
 
     //De-encrypt and Validate signature
-    pre_pkt_len = VERIFY_PKT_HEADER_LENGTH-VERIFY_PKT_PAYLOAD_LEN_LENGTH-VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH;
+    pre_pkt_len = VERIFY_PKT_MSG_TYPE_LENGTH + VERIFY_PKT_TERMINAL_ID_LENGTH + VERIFY_PKT_WORKER_ID_LENGTH;
     memcpy(send_terminal, packet, pre_pkt_len);
 
     //malloc? free?
@@ -134,14 +134,17 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
 
     //connect to proxy server as random mode, send plain text pkt to proxy server and wait for backward pkt from proxy server
-    ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
-                                    (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
+   	//ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
+    //                                (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
+
+	memset(from_proxy_plain_text, 'X', 70);
+	from_proxy_plain_text_len = 70;
 
     //add signature and en-crypt the backward pkt
     if(1==ret) {
 
         bzero(send_terminal, MAXPACKETSIZE);
-        ret = Sign_and_encrypt_plain_text(server_private_key, terminal_pub_key,
+        ret = Sign_and_encrypt_plain_text(terminal_pub_key, server_private_key,
                                           (unsigned char *) from_proxy_plain_text,
                                           (unsigned int) from_proxy_plain_text_len,
                                           (unsigned char * *) &send_terminal_cipher_text,
@@ -294,8 +297,8 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     memcpy(pkt_header->rsp_memo_txt, pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
     memcpy(&(pkt_header->payload_len), pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
 
-	DBG("Pay load bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
-	if(pkt_header->payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
+    DBG("Pay load bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
+    if(pkt_header->payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
         return 1;
     } else {
         return -1;
@@ -437,7 +440,7 @@ int Get_server_private_key_from_file(RSA **server_private_key)
     int ret = 0;
     RSA *key = NULL;
 
-    ret = Get_private_key_from_file(&key, (char *)"./openssl/pri_keyfile.txt");
+    ret = Get_private_key_from_file(&key, (char *)"./openssl/yao_lagate.pem");
     if(1==ret) {
         *server_private_key = key;
         return 1;
