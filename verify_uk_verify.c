@@ -47,7 +47,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     bzero(send_terminal, MAXPACKETSIZE);
 
-    sleep(45);
+   // sleep(45);
 
     //get verifing-packet header and parse the verifing-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
@@ -134,11 +134,11 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
 
     //connect to proxy server as random mode, send plain text pkt to proxy server and wait for backward pkt from proxy server
-   	//ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
-    //                                (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
+   	ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
+                                    (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
-	memset(from_proxy_plain_text, 'X', 70);
-	from_proxy_plain_text_len = 70;
+	//memset(from_proxy_plain_text, 'X', 70);
+	//from_proxy_plain_text_len = 70;
 
     //add signature and en-crypt the backward pkt
     if(1==ret) {
