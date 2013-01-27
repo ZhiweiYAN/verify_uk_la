@@ -15,7 +15,7 @@
  *
  * =====================================================================================
  */
-#include "openSSL_sign_encrypt_RSA.h"
+#include "openssl_sign_encrypt_rsa.h"
 
 int Generate_pub_key_from_files(char* file_name, RSA** rsa)
 {
@@ -98,7 +98,7 @@ char *unbase64(unsigned char *input, int length)
     return buffer;
 }
 
-/* Returns the malloc'd buffer, and puts the size of the buffer into the integer
+/* Returns the malloc buffer, and puts the size of the buffer into the integer
  * pointed to by the second argument.
  */
 unsigned char *Convert_rsa_to_der_for_pub_key(RSA *rsa, int *len)

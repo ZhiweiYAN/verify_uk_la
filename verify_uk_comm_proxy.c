@@ -81,7 +81,7 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
         close(proxy_sd);
         return -1;
     } else {
-        DBG("send to proxy %d bytes: |%s|\n", count, msg_to_proxy);
+        DBG("Send to proxy %d bytes: |%s|\n", count, msg_to_proxy);
     }
 
     /* Recv a message */
@@ -92,7 +92,7 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
         close(proxy_sd);
         return -1;
     } else {
-        DBG("recv from proxy %d bytes: |%s|\n", count, msg_from_proxy);
+        DBG("Recv from proxy %d bytes: |%s|\n", count, msg_from_proxy);
         *msg_from_proxy_len = count;
         LOG(INFO)<<"successfully recv msg from proxy server:" << msg_from_proxy;
     }

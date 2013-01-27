@@ -297,7 +297,7 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     memcpy(pkt_header->rsp_memo_txt, pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
     memcpy(&(pkt_header->payload_len), pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
 
-    DBG("Pay load bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
+    DBG("Payload bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
     if(pkt_header->payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
         return 1;
     } else {

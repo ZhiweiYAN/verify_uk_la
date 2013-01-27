@@ -98,6 +98,7 @@ int Init_verify_data_socket(int port,int *welcome_sd, struct sockaddr_in *sa)
 int Start_network_service(int port,int *welcome_sd, struct sockaddr_in *sa, const char* s)
 {
     int reuse =1;
+	
     /* Check input parameters */
     if (1024>port||NULL==welcome_sd||NULL==sa) {
         OUTPUT_ERROR;
