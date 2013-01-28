@@ -17,13 +17,19 @@
  */
 #include "verify_uk_verify.h"
 
-
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Do_verify_procedures
+ *  Description:  Verify the incoming packet from terminals, transfer the unencrypted
+ *                plain packet to proxy servers if the packet is verified successfully.
+ * =====================================================================================
+ */
 int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 {
     int ret = 0;
 
-    char send_terminal[MAXPACKETSIZE];
-    int send_terminal_len = 0;
+    char buf_send_terminal[MAXPACKETSIZE];
+    int buf_send_terminal_len = 0;
 
     char *send_terminal_cipher_text = NULL;
     int send_terminal_cipher_text_len = 0;
@@ -38,48 +44,57 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     unsigned char *to_proxy_plain_text = NULL;
     unsigned int   to_proxy_plain_text_len = 0;
 
-    unsigned char * from_proxy_plain_text = NULL;
-    unsigned int 	from_proxy_plain_text_len = 0;
+    unsigned char *from_proxy_plain_text = NULL;
+    unsigned int from_proxy_plain_text_len = 0;
 
     VerifyPacketHeader veri_pkt_hdr;
     RSA *terminal_pub_key = NULL;
     RSA *server_private_key = NULL;
 
-    bzero(send_terminal, MAXPACKETSIZE);
+    bzero(buf_send_terminal, MAXPACKETSIZE);
 
+    //sleep to debug option for multi-process
    // sleep(45);
 
-    //get verifing-packet header and parse the verifing-packet header
+    //get verifying-packet header and parse the verifying-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
     ret = Parse_verify_pkt_header(packet, packet_size, &veri_pkt_hdr);
     if(-1 == ret) {
-        LOG(ERROR)<<"Parse verify pkt header, error.";
         OUTPUT_ERROR;
-        ret = PrepareErrorResPacket(send_terminal, ERROR_INCOMPLETE_PKT);
-        send_terminal_len = strlen(send_terminal);
+        LOG_ERROR("Failed to parse verify packet header: terminal_id=%s, worker_id=%s.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
+        ret = Prepare_error_response_packet(buf_send_terminal, ERROR_INCOMPLETE_PKT);
+        buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
+    }else{
+        DBG("Success to parse verify packet header: terminal_id=%s, worker_id=%s.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
     }
 
+
     //get the public key of terminal
-//    ret = Get_terminal_pub_key(&terminal_pub_key, &veri_pkt_hdr);
-    ret = Get_terminal_pub_key_from_file(&terminal_pub_key);
+//    ret = Get_terminal_pub_key_from_db(&terminal_pub_key, &veri_pkt_hdr);
+    ret = Get_terminal_pub_key_from_file(&terminal_pub_key, &veri_pkt_hdr);
     if (-1==ret) {
-        LOG(ERROR)<<"pub_key_of_the_terminal_id, while finding on server side, error.";
         OUTPUT_ERROR;
-        ret = PrepareErrorResPacket(send_terminal, ERROR_NO_TERMINAL_RSA_PUBKEY);
-        send_terminal_len = strlen(send_terminal);
+        LOG_ERROR("Failed get terminal %s:%s public rsa-key.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
+        ret = Prepare_error_response_packet(buf_send_terminal, ERROR_NO_TERMINAL_RSA_PUBKEY);
+        buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
+    }else{
+        DBG("Success to get terminal %s:%s public rsa-key.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
+
     }
 
     //get the private key of verify server
-//    ret = Get_server_private_key(&server_private_key);
+//    ret = Get_server_private_key_from_db(&server_private_key);
     ret = Get_server_private_key_from_file(&server_private_key);
     if (-1==ret) {
-        LOG(ERROR)<<"while finding private key of server, nothing on server side, error.";
         OUTPUT_ERROR;
-        ret = PrepareErrorResPacket(send_terminal, ERROR_NO_SRV_RSA_PRIKEY);
-        send_terminal_len = strlen(send_terminal);
+        LOG_ERROR("Failed to get server rsa key pair.\n");
+        ret = Prepare_error_response_packet(buf_send_terminal, ERROR_NO_SRV_RSA_PRIKEY);
+        buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
+    }else{
+        DBG("Success to get server rsa key pair.\n");
     }
 
     cipher_text = (unsigned char *)packet + VERIFY_PKT_HEADER_LENGTH;
@@ -89,9 +104,11 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     //De-encrypt and Validate signature
     pre_pkt_len = VERIFY_PKT_MSG_TYPE_LENGTH + VERIFY_PKT_TERMINAL_ID_LENGTH + VERIFY_PKT_WORKER_ID_LENGTH;
-    memcpy(send_terminal, packet, pre_pkt_len);
+    memcpy(buf_send_terminal, packet, pre_pkt_len);
 
     //malloc? free?
+    //The memory for the variable 'to_proxy_plain_text' will be allocated in the
+    //function decrypt_and_validate_sign().
     ret = decrypt_and_validate_sign(server_private_key, terminal_pub_key,
                                     cipher_text, cipher_text_len,
                                     &to_proxy_plain_text, &to_proxy_plain_text_len);
@@ -99,90 +116,95 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     if(1!=ret) {
         if(ERROR_DECRYPT==ret) {
-            LOG(ERROR)<<"while decrypting cipher text, error.";
             OUTPUT_ERROR;
-            PrepareErrorResPacket(send_terminal, ERROR_DECRYPT);
-            send_terminal_len = strlen(send_terminal);
+            LOG_ERROR("while decrypting cipher text, error.\n");
+            Prepare_error_response_packet(buf_send_terminal, ERROR_DECRYPT);
+            buf_send_terminal_len = strlen(buf_send_terminal);
             goto Do_verify_procedures_END;
         }
-
         if(ERROR_VALIDATE_SIGN==ret) {
-            LOG(ERROR)<<"while validating the signatures, error.";
             OUTPUT_ERROR;
-            PrepareErrorResPacket(send_terminal, ERROR_VALIDATE_SIGN);
-
-            send_terminal_len = strlen(send_terminal);
+            LOG_ERROR("while validating the signatures, error.\n");
+            Prepare_error_response_packet(buf_send_terminal, ERROR_VALIDATE_SIGN);
+            buf_send_terminal_len = strlen(buf_send_terminal);
             goto Do_verify_procedures_END;
         } else {
-            LOG(ERROR)<<"while decrypting cipher text and validating the signatures, error.";
             OUTPUT_ERROR;
-            PrepareErrorResPacket(send_terminal, ERROR_VALIDATE_SIGN);
-            send_terminal_len = strlen(send_terminal);
+            LOG(ERROR)<<"while decrypting cipher text and validating the signatures, error.";
+            Prepare_error_response_packet(buf_send_terminal, ERROR_VALIDATE_SIGN);
+            buf_send_terminal_len = strlen(buf_send_terminal);
             goto Do_verify_procedures_END;
         }
     }
 
+	DBG("Send to proxy packet %d bytes: |%s|.\n", to_proxy_plain_text_len, to_proxy_plain_text);
+
+    //Prepare the memory for the packet from the server proxy.
     from_proxy_plain_text = (unsigned char *)malloc(MAX_SIZE_BUFFER_RECV+1);
     if(NULL==from_proxy_plain_text) {
-        LOG(ERROR)<<"memory malloc, failed.";
         OUTPUT_ERROR;
-        PrepareErrorResPacket(send_terminal, ERROR_MEMORY_LACK);
-        send_terminal_len = strlen(send_terminal);
+        LOG(ERROR)<<"memory malloc, failed.";
+        Prepare_error_response_packet(buf_send_terminal, ERROR_MEMORY_LACK);
+        buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
     }
 
     bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
 
-    //connect to proxy server as random mode, send plain text pkt to proxy server and wait for backward pkt from proxy server
+    //connect to proxy server as random mode, send plain text pkt to proxy server 
+    //and wait for backward pkt from proxy server.
+    from_proxy_plain_text_len = 0;
    	ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
                                     (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
+    //for debug
 	//memset(from_proxy_plain_text, 'X', 70);
 	//from_proxy_plain_text_len = 70;
 
     //add signature and en-crypt the backward pkt
-    if(1==ret) {
-
-        bzero(send_terminal, MAXPACKETSIZE);
+    if(1==ret && 0< from_proxy_plain_text_len) {
+        bzero(buf_send_terminal, MAXPACKETSIZE);
+        send_terminal_cipher_text_len = 0;
         ret = Sign_and_encrypt_plain_text(terminal_pub_key, server_private_key,
                                           (unsigned char *) from_proxy_plain_text,
                                           (unsigned int) from_proxy_plain_text_len,
                                           (unsigned char * *) &send_terminal_cipher_text,
                                           (unsigned int *) &send_terminal_cipher_text_len);
-        if(1==ret) {
-            memset(send_terminal, ' ', VERIFY_PKT_HEADER_LENGTH);
-            memcpy(send_terminal, packet, VERIFY_PKT_MSG_TYPE_LENGTH+VERIFY_PKT_TERMINAL_ID_LENGTH+VERIFY_PKT_WORKER_ID_LENGTH);
-            strncpy(send_terminal+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "0", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-            strncpy(send_terminal+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+
+        //if we can add signature and encrypt the backward packet successfully. 
+        if(1==ret && 0<send_terminal_cipher_text_len) {
+            memset(buf_send_terminal, ' ', VERIFY_PKT_HEADER_LENGTH);
+            memcpy(buf_send_terminal, packet, VERIFY_PKT_MSG_TYPE_LENGTH+VERIFY_PKT_TERMINAL_ID_LENGTH+VERIFY_PKT_WORKER_ID_LENGTH);
+            strncpy(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "0", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+            strncpy(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                     "SUCCESS",VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
-            memcpy(send_terminal+VERIFY_PKT_PAYLOAD_LEN_POSITION,
+            memcpy(buf_send_terminal+VERIFY_PKT_PAYLOAD_LEN_POSITION,
                    &send_terminal_cipher_text_len,
                    VERIFY_PKT_PAYLOAD_LEN_LENGTH);
-            memcpy(send_terminal+VERIFY_PKT_HEADER_LENGTH,
+            memcpy(buf_send_terminal+VERIFY_PKT_HEADER_LENGTH,
                    send_terminal_cipher_text, send_terminal_cipher_text_len);
-            send_terminal_len = VERIFY_PKT_HEADER_LENGTH + send_terminal_cipher_text_len;
-
+            buf_send_terminal_len = VERIFY_PKT_HEADER_LENGTH + send_terminal_cipher_text_len;
         }
 
     } else {
-        LOG(ERROR)<<"proxy link down.";
         OUTPUT_ERROR;
-        PrepareErrorResPacket(send_terminal, ERROR_LINK_PROXY);
-        send_terminal_len = strlen(send_terminal);
+        LOG(ERROR)<<"The link with proxy server seems down.";
+        Prepare_error_response_packet(buf_send_terminal, ERROR_LINK_PROXY);
+        buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
     }
 
     RSA_free(terminal_pub_key);
     RSA_free(server_private_key);
 
-
-
+    //label for return.
 Do_verify_procedures_END:
-    count = send( connection_sd, send_terminal, send_terminal_len, 0 );
-    DBG("\n%s %s|%s|\n","send to terminal","bytes", send_terminal);
+    count = send( connection_sd, buf_send_terminal, buf_send_terminal_len, 0 );
+    DBG("\nSend to terminal with %d bytes: |%s|\n", count, buf_send_terminal);
 
     if (0>count) {
         OUTPUT_ERROR;
+        LOG_ERROR("Failed to send backward to terminals\n");
     }
 
     if(NULL!=send_terminal_cipher_text) {
@@ -206,7 +228,13 @@ Do_verify_procedures_END:
 }
 
 
-int PrepareErrorResPacket(char *pkt, int error_code)
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Prepare_error_response_packet
+ *  Description:  Generate backward packet according to the error codes.
+ * =====================================================================================
+ */
+int Prepare_error_response_packet(char *pkt, int error_code)
 {
     int ret = 0;
 
@@ -271,6 +299,12 @@ int PrepareErrorResPacket(char *pkt, int error_code)
 }
 
 
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Parse_verify_pkt_header
+ *  Description:  Parse the incoming packet from terminals
+ * =====================================================================================
+ */
 int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_header)
 {
     if(NULL==pkt) {
@@ -284,7 +318,7 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     }
 
     if(pkt_len<VERIFY_PKT_HEADER_LENGTH) {
-        LOG(ERROR)<<"VERIFY_PKT_HEADER_LENGTH, too short, " <<pkt_len<< " less than " << VERIFY_PKT_HEADER_LENGTH;
+        LOG_ERROR("Verify packet header length, too short, %d bytes, less than standard length %d", pkt_len, VERIFY_PKT_HEADER_LENGTH);
         return -1;
     }
 
@@ -298,21 +332,40 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     memcpy(&(pkt_header->payload_len), pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
 
     DBG("Payload bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
+
+    //Examine the packet length whether it is valid or not.
     if(pkt_header->payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
+
+        //Good
         return 1;
     } else {
+
+        //Bad
         return -1;
     }
 
 }
 
-int Get_terminal_pub_key_from_file(RSA **terminal_pub_key)
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Get_terminal_pub_key_from_file
+ *  Description:  Get terminal public key from PEM file or Binary file
+ * =====================================================================================
+ */
+int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, VerifyPacketHeader *pkt_hdr)
 {
     int ret = 0;
 
     RSA * pub_key = NULL;
 
-    ret =  Generate_pub_key_from_files((char*)PUB_KEY_BARE_BIN_FILE_NAME, &pub_key);
+    //Generate the file name with the format PEM or Binary.
+    char pem_filename[COMMON_LENGTH];
+    bzero(pem_filename, COMMON_LENGTH);
+
+    snprintf(pem_filename, COMMON_LENGTH, "%s_%s_pubkey.bin", pkt_hdr->terminal_id, pkt_hdr->worker_id);
+
+    ret =  Generate_pub_key_from_file( &pub_key, pem_filename);
+    //ret = Get_public_key_from_file(&pub_key, pem_filename);
     if(-1==ret) {
         *terminal_pub_key = NULL;
         return -1;
@@ -320,12 +373,15 @@ int Get_terminal_pub_key_from_file(RSA **terminal_pub_key)
         *terminal_pub_key = pub_key;
         return 1;
     }
-
-
 }
 
-
-int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Get_terminal_pub_key_from_db
+ *  Description:  Connect to PostgreSQL to query the pubic key of rsa.
+ * =====================================================================================
+ */
+int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
 {
 
     int ret = 0;
@@ -429,12 +485,25 @@ int Get_terminal_pub_key(RSA *key, VerifyPacketHeader *pkt_header)
 
 }
 
-int Get_server_private_key(RSA *server_private_key)
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Get_server_private_key_from_db
+ *  Description:  
+ * =====================================================================================
+ */
+int Get_server_private_key_from_db(RSA *server_private_key)
 {
     int ret = 0;
     return ret;
 }
 
+
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Get_server_private_key_from_file
+ *  Description:  
+ * =====================================================================================
+ */
 int Get_server_private_key_from_file(RSA **server_private_key)
 {
     int ret = 0;
@@ -467,6 +536,12 @@ int Record_pkt_regular_table( char *pkt, int pkt_size,
 
 
 
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Connect_db_server
+ *  Description:  
+ * =====================================================================================
+ */
 PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip_addr)
 {
     PGconn  *conn;
@@ -494,5 +569,4 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
 
     return conn;
 }
-
 

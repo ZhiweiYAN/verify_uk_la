@@ -118,12 +118,16 @@ int main(void)
     //Generate public key and private key, which are stored in an RSA object.
     RSA *rsa = NULL;
     unsigned long exp =  RSA_F4; //65537
-    rsa = RSA_generate_key(KEY_SIZE, exp, callback, NULL);
-    ret = Save_private_key_to_file(rsa, (char *)"pri_keyfile.txt");
+//    rsa = RSA_generate_key(KEY_SIZE, exp, callback, NULL);
+    ret = Generate_pub_key_from_file(&rsa, (char *)"terminal_pub_key.dat");
+//    ret = Get_private_key_from_file(&rsa, (char *)"terminal_pub_key.dat");
+//    ret = Save_private_key_to_file(rsa, (char *)"pri_keyfile.txt");
 
-    //Remove_private_key(rsa);
+    Remove_private_key(rsa);
 
-    ret = Save_private_key_to_file(rsa, (char *)"pub_keyfile.txt");
+    ret = Save_public_key_to_file(rsa, (char *)"GZ1616_1009_pubkey.pem");
+
+    return 1;
 
     unsigned char msg[]="What is the expected output? What do you see instead?";
     // unsigned char re_msg[]="yznzw world, OpenSSL";

@@ -89,9 +89,11 @@ RSA *Convert_der_to_rsa_for_pub_key(unsigned char *buf, long len);
 int Save_private_key_to_file(RSA *rsa, char* key_file);
 int Get_private_key_from_file(RSA **rsa, char* key_file);
 
+int Save_public_key_to_file(RSA *rsa, char* key_file);
+int Get_public_key_from_file(RSA **rsa, char* key_file);
 
 
-int Generate_pub_key_from_files(char* file_name, RSA** rsa);
+int Generate_pub_key_from_file(RSA** rsa, char* file_name);
 void Remove_private_key(RSA *r);
 
 

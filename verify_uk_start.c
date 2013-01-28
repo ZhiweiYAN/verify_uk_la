@@ -202,7 +202,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
             LOG(INFO)<<"Verify UK: Recv data from Terminal.";
             LOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
-            DBG("\n%s:|%s|\n","Verify UK: Recv data from Terminal",buf_recv);
+            DBG("\nVerify UK: Recv data from Terminal:|%s|.\n",buf_recv);
 
             /* Prepare the actual memory for the packet */
             packet = (char *)malloc(sizeof(char)*(count+1));

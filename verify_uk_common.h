@@ -101,6 +101,7 @@
 #define MAX_SIZE_BUFFER_RECV 400000
 #define MAXPACKETSIZE 400000
 #define COMM_LENGTH 256
+#define COMMON_LENGTH 256
 
 
 enum VERIFY_ERROR_CODE {
@@ -115,14 +116,15 @@ enum VERIFY_ERROR_CODE {
 
 
 #ifdef DEBUG
-# define DBG(format, args...) printf(format, ##args)
-# define DBG_WAIT {sleep(15);}
+#define DBG(format, args...) do{ printf(format, ##args); char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); DLOG(INFO)<<info_string; free(info_string);fflush(NULL);}while(0);
+#define DBG_WAIT {sleep(15);}
 #else
 # define DBG(format, args...)
 #endif
 
+#define LOG_ERROR(format, args...) do{ printf(format, ##args); char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(ERROR)<<info_string; free(info_string);fflush(NULL);}while(0);
 #define OUTPUT_OK do{printf("[\033[32mOK\033[0m]\n");fflush(NULL);}while(0);
-#define OUTPUT_ERROR do{ printf("[\033[31mERROR\033[0m] %s:%d,%s()\n",__FILE__, __LINE__, __FUNCTION__);LOG(ERROR)<<__FUNCTION__;fflush(NULL);}while(0);
+#define OUTPUT_ERROR do{ printf("[\033[31mERROR\033[0m] %s:%d,%s()\n",__FILE__, __LINE__, __FUNCTION__);fflush(NULL);}while(0);
 
 //Fesponse code for downlink to terminals.
 enum ResponseCodeFromVerifySrv {RSP_SUCCESS=0,
