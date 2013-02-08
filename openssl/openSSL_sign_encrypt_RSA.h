@@ -83,7 +83,9 @@ int str2hex( char* str, int str_len, void* hex, int *hex_len);
 
 
 unsigned char *Convert_rsa_to_der_for_pub_key(RSA *rsa, int *len);
+unsigned char *Convert_rsa_to_der_for_private_key(RSA *rsa, int *len);
 RSA *Convert_der_to_rsa_for_pub_key(unsigned char *buf, long len);
+RSA *Convert_der_to_rsa_for_private_key(unsigned char *buf, long len);
 
 
 int Save_private_key_to_file(RSA *rsa, char* key_file);

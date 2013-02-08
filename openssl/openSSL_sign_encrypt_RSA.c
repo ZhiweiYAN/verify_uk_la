@@ -23,7 +23,7 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
     char subfix_pub_key[SUBFIX_PUB_KEY_LEN]= {0x02,0x03,0x01,0x00,0x01 };
 
     char *buf = NULL;
-	buf = (char*)malloc(PUB_KEY_DER_FORMAT_LEN+1);
+    buf = (char*)malloc(PUB_KEY_DER_FORMAT_LEN+1);
     bzero(buf, PUB_KEY_DER_FORMAT_LEN+1);
 
     FILE *fp = NULL;
@@ -32,22 +32,22 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
         return -1;
     }
 
-	char *p = NULL;
-	p = buf;
+    char *p = NULL;
+    p = buf;
     memcpy(buf, prefix_pub_key, PRIFIX_PUB_KEY_LEN);
     memcpy(buf + PRIFIX_PUB_KEY_LEN + PUB_KEY_BARE_LEN, subfix_pub_key, SUBFIX_PUB_KEY_LEN);
     fread(buf + PRIFIX_PUB_KEY_LEN, PUB_KEY_BARE_LEN, 1, fp);
 
     fclose(fp);
     fp = NULL;
-	buf = p;
+    buf = p;
 
     RSA *rsa_pub_key = NULL;
 
     const unsigned char *p_buf = (const unsigned char *)buf;
     rsa_pub_key = d2i_RSAPublicKey (NULL, &p_buf, PUB_KEY_DER_FORMAT_LEN);
 
-	LOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
+    LOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
 
     if(NULL==rsa_pub_key) {
         //ERR_print_errors_fp(stdout);
@@ -59,10 +59,19 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
     }
 }
 
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  base64
+ *  Description:  
+ * =====================================================================================
+ */
 char *base64(const unsigned char *input, int length)
 {
     BIO *bmem, *b64;
     BUF_MEM *bptr;
+
+    char *buff = NULL;
+
 
     b64 = BIO_new(BIO_f_base64());
     bmem = BIO_new(BIO_s_mem());
@@ -71,7 +80,11 @@ char *base64(const unsigned char *input, int length)
     BIO_flush(b64);
     BIO_get_mem_ptr(b64, &bptr);
 
-    char *buff = (char *)malloc(bptr->length);
+    buff = (char *)malloc(bptr->length);
+    if(NULL==buff){
+        return NULL;
+    }
+
     memcpy(buff, bptr->data, bptr->length-1);
     buff[bptr->length-1] = 0;
 
@@ -80,11 +93,20 @@ char *base64(const unsigned char *input, int length)
     return buff;
 }
 
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  unbase64
+ *  Description:  
+ * =====================================================================================
+ */
 char *unbase64(unsigned char *input, int length)
 {
     BIO *b64, *bmem;
 
     char *buffer = (char *)malloc(length);
+    if(NULL==buffer){
+        return NULL;
+    }
     memset(buffer, 0, length);
 
     b64 = BIO_new(BIO_f_base64());
@@ -103,14 +125,33 @@ char *unbase64(unsigned char *input, int length)
  */
 unsigned char *Convert_rsa_to_der_for_pub_key(RSA *rsa, int *len)
 {
-    unsigned char *buf, *next;
+    unsigned char *buf=NULL, *p=NULL;
 
-    *len = i2d_RSAPublicKey(rsa, 0);
-    if (!(buf = next = (unsigned char *)malloc(*len))) return 0;
-    i2d_RSAPublicKey(rsa, &next); /* If we use buf here, return buf; becomes wrong */
+    *len = i2d_RSAPublicKey(rsa, NULL);
+    buf = (unsigned char*)OPENSSL_malloc(*len);
+    if(NULL==buf){
+        return 0;
+    }
+
+    p = buf;
+    i2d_RSAPublicKey(rsa, &p); /* If we use buf here, return buf; becomes wrong */
     return buf;
 }
 
+unsigned char *Convert_rsa_to_der_for_private_key(RSA *rsa, int *len)
+{
+    unsigned char *buf=NULL, *p=NULL;
+
+    *len = i2d_RSAPrivateKey(rsa, NULL);
+    buf = (unsigned char*)OPENSSL_malloc(*len);
+    if(NULL==buf){
+        return 0;
+    }
+
+    p = buf;
+    i2d_RSAPrivateKey(rsa, &p); /* If we use buf here, return buf; becomes wrong */
+    return buf;
+}
 
 
 /* Note that the pointer to the buffer gets copied in.  Therefore, when
@@ -119,9 +160,37 @@ unsigned char *Convert_rsa_to_der_for_pub_key(RSA *rsa, int *len)
  */
 RSA *Convert_der_to_rsa_for_pub_key(unsigned char *buf, long len)
 {
-    return d2i_RSAPublicKey(NULL, ( const unsigned char**)&buf, len);
+    RSA *rsa = NULL;
+    unsigned char *p = NULL;
+
+    p = buf;
+
+    rsa = d2i_RSAPublicKey(NULL, ( const unsigned char**)&p, len);
+
+    if (NULL==rsa){
+        return NULL;
+    }
+    else{
+        return rsa;
+    }
 }
 
+RSA *Convert_der_to_rsa_for_private_key(unsigned char *buf, long len)
+{
+    RSA *rsa = NULL;
+    unsigned char *p = NULL;
+
+    p = buf;
+
+    rsa = d2i_RSAPrivateKey(NULL, ( const unsigned char**)&p, len);
+
+    if (NULL==rsa){
+        return NULL;
+    }
+    else{
+        return rsa;
+    }
+}
 
 void Remove_private_key(RSA *r)
 {
@@ -444,6 +513,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 {
     int           ret = 0;
     BN_CTX        *tctx = NULL;
+    BN_CTX        *tctx_verify = NULL;
     unsigned int  ctlen =0, i=0, l=0;
     unsigned char *decrypt=NULL,  *p=NULL;
 
@@ -496,11 +566,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
     for (ctlen = i = 0;  i < cipher_text_len / RSA_size(receiver_pub_private_key_for_decrypt);  i++) {
         if (!(l = RSA_private_decrypt(RSA_size(receiver_pub_private_key_for_decrypt), cipher_text, p, receiver_pub_private_key_for_decrypt,
                                       padding_mode))) {
-            char buf[2048];
-            ERR_load_crypto_strings();
-            ERR_error_string(ERR_get_error(), buf);
-            fprintf(stderr, "%s\n", buf);
-            DLOG(INFO)<<"decrypt error info:"<<buf;
+            print_rsa_error_string();
             ret = -1;
             goto err;
         }
@@ -509,7 +575,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         ctlen += l;
     }
 
-	printf("Decrypt txt: %s", decrypt+sig_len);
+    printf("Decrypt txt: %s", decrypt+sig_len);
     //split the signature text and plain text
     sig_len = RSA_size(signers_pub_key_for_signature);
     sig = (unsigned char *)malloc(sig_len);
@@ -541,45 +607,52 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         goto err;
     }
 
+
+    if (!(tctx_verify = BN_CTX_new(  ))) {
+        ret = -1;
+        goto err;
+    }
 //    //verify the signature of signer.
+//    RSA_blinding_on(signers_pub_key_for_signature, tctx_verify);
 //	ret = RSA_verify(NID_sha1, hash, SHA1_LEN, sig, RSA_size(signers_pub_key_for_signature), signers_pub_key_for_signature);
-//  
+//
 //    if (1!=ret){
 //        LOG(ERROR)<<"RSA verify, failed";
 //		print_rsa_error_string();
 //        ret = -1;
 //       goto err;
 //    }
-   
 
-	//decrypt signature with pubkey_terminal, comparing to sha1 of plain txt byte to byte.
-	unsigned char sig_decrypt[SHA1_LEN];
-	memset(sig_decrypt, 0, SHA1_LEN);
 
-	ret = RSA_public_decrypt(RSA_size(signers_pub_key_for_signature), 
-		sig, sig_decrypt, signers_pub_key_for_signature, padding_mode);
+    //decrypt signature with pubkey_terminal, comparing to sha1 of plain txt byte to byte.
+    unsigned char sig_decrypt[SHA1_LEN];
+    memset(sig_decrypt, 0, SHA1_LEN);
 
-	if(-1==ret){
-		print_rsa_error_string();
+    ret = RSA_public_decrypt(RSA_size(signers_pub_key_for_signature),
+                             sig, sig_decrypt, signers_pub_key_for_signature, padding_mode);
+
+    if(-1==ret) {
+        print_rsa_error_string();
         goto err;
+    } else {
+        DLOG(INFO)<<hex2str(sig_decrypt,SHA1_LEN)<<"signature txt:" ;
+        DLOG(INFO)<<hex2str(hash, SHA1_LEN)<<"recv signature txt:";
     }
-    else{
-		DLOG(INFO)<<hex2str(sig_decrypt,SHA1_LEN)<<"signature txt:" ;
-		DLOG(INFO)<<hex2str(hash, SHA1_LEN)<<"recv signature txt:";
-	}
-    
+
     ret = memcmp(hash,sig_decrypt, SHA1_LEN);
 
-    if(0==ret){
+    if(0==ret) {
         ret = 1;
-    }else{
+    } else {
         ret = -1;
-    } 
-    
+    }
+
 
 err:
     RSA_blinding_off(receiver_pub_private_key_for_decrypt);
     BN_CTX_free(tctx);
+    RSA_blinding_off(signers_pub_key_for_signature);
+    BN_CTX_free(tctx_verify);
 
     if(NULL!=decrypt) {
         free(decrypt);

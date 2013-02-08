@@ -1,4 +1,5 @@
 # Compiled Object files
+run_*
 *.slo
 *.lo
 *.o

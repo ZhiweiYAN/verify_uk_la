@@ -18,7 +18,7 @@
 
 #include "verify_uk_comm_proxy.h"
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  SendRecv_message_to_proxy
  *  Description:  Connect to the proxy server IP randomly
@@ -73,13 +73,13 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
 
     /*connect to proxy*/
     success = connect(proxy_sd, (struct sockaddr*)&proxy_sa, sizeof(proxy_sa));
-    if(success < 0){
+    if(success < 0) {
         OUTPUT_ERROR;
         LOG(ERROR)<<"failed to connect proxy server " << proxy_address_array[i] <<":"<<proxy_data_port;
         DBG("Failed to connect proxy server %s : %d.\n", proxy_address_array[i], proxy_data_port);
         close(proxy_sd);
         return -1;
-    }else{
+    } else {
         DBG("Success to connect to the proxy server %s:%d.\n", proxy_address_array[i], proxy_data_port);
         DLOG(INFO)<<"successfully connect to proxy server" << proxy_address_array[i] <<":" <<proxy_data_port;
     }
@@ -114,7 +114,7 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
     return 1;
 }
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Read_proxy_parameters
  *  Description:  Read the configuration of proxy servers, including IP and data port

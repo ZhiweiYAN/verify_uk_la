@@ -48,13 +48,13 @@ clean:
 	find ./ -name "log*.*" |xargs rm -R -v --force
 	find ./ -name "*.orig" |xargs rm -R -v --force
 	find ./ -name "*.bak" |xargs rm -R -v --force
-	rm --force $(TARGET) 
-	rm --force *.bak
-	rm --force *.orig
-	rm --force log_error.txt
-	rm --force *.log
-	rm --force ./log/*.*
-	rm --force run_*
+#	rm -v --force $(TARGET) 
+	rm -v --force *.bak
+	rm -v --force *.orig
+	rm -v --force log_error.txt
+	rm -v --force *.log
+	rm -v --force ./log/*.*
+#	rm -v --force run_*
 .PHONY:pp
 pp:
 	-find ./ -name "*" -print |egrep '\.cpp$$|\.c$$|\.h$$' |xargs astyle --style=linux -s -n;

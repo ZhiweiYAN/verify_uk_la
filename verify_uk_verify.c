@@ -17,7 +17,7 @@
  */
 #include "verify_uk_verify.h"
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Do_verify_procedures
  *  Description:  Verify the incoming packet from terminals, transfer the unencrypted
@@ -54,7 +54,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     bzero(buf_send_terminal, MAXPACKETSIZE);
 
     //sleep to debug option for multi-process
-   // sleep(45);
+    // sleep(45);
 
     //get verifying-packet header and parse the verifying-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
@@ -65,7 +65,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         ret = Prepare_error_response_packet(buf_send_terminal, ERROR_INCOMPLETE_PKT);
         buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
-    }else{
+    } else {
         DBG("Success to parse verify packet header: terminal_id=%s, worker_id=%s.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
     }
 
@@ -75,11 +75,11 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     ret = Get_terminal_pub_key_from_file(&terminal_pub_key, &veri_pkt_hdr);
     if (-1==ret) {
         OUTPUT_ERROR;
-        LOG_ERROR("Failed get terminal %s:%s public rsa-key.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
+        LOG_ERROR("Failed to get terminal %s:%s public rsa-key.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
         ret = Prepare_error_response_packet(buf_send_terminal, ERROR_NO_TERMINAL_RSA_PUBKEY);
         buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
-    }else{
+    } else {
         DBG("Success to get terminal %s:%s public rsa-key.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
 
     }
@@ -93,7 +93,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         ret = Prepare_error_response_packet(buf_send_terminal, ERROR_NO_SRV_RSA_PRIKEY);
         buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
-    }else{
+    } else {
         DBG("Success to get server rsa key pair.\n");
     }
 
@@ -117,33 +117,33 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     if(1!=ret) {
         if(ERROR_DECRYPT==ret) {
             OUTPUT_ERROR;
-            LOG_ERROR("while decrypting cipher text, error.\n");
+            LOG_ERROR("while decrypting cipher text from %s %s, error.\n",veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
             Prepare_error_response_packet(buf_send_terminal, ERROR_DECRYPT);
             buf_send_terminal_len = strlen(buf_send_terminal);
             goto Do_verify_procedures_END;
         }
         if(ERROR_VALIDATE_SIGN==ret) {
             OUTPUT_ERROR;
-            LOG_ERROR("while validating the signatures, error.\n");
+            LOG_ERROR("while validating the signatures from %s %s, error.\n",veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
             Prepare_error_response_packet(buf_send_terminal, ERROR_VALIDATE_SIGN);
             buf_send_terminal_len = strlen(buf_send_terminal);
             goto Do_verify_procedures_END;
         } else {
             OUTPUT_ERROR;
-            LOG(ERROR)<<"while decrypting cipher text and validating the signatures, error.";
+            LOG_ERROR("while decrypting cipher text and validating the signatures from %s %s, error.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
             Prepare_error_response_packet(buf_send_terminal, ERROR_VALIDATE_SIGN);
             buf_send_terminal_len = strlen(buf_send_terminal);
             goto Do_verify_procedures_END;
         }
     }
 
-	DBG("Send to proxy packet %d bytes: |%s|.\n", to_proxy_plain_text_len, to_proxy_plain_text);
+    DBG("Send to proxy packet %d bytes: |%s|.\n", to_proxy_plain_text_len, to_proxy_plain_text);
 
     //Prepare the memory for the packet from the server proxy.
     from_proxy_plain_text = (unsigned char *)malloc(MAX_SIZE_BUFFER_RECV+1);
     if(NULL==from_proxy_plain_text) {
         OUTPUT_ERROR;
-        LOG(ERROR)<<"memory malloc, failed.";
+        LOG(ERROR)<<"memory malloc for the variable from_proxy_plain_text, failed.";
         Prepare_error_response_packet(buf_send_terminal, ERROR_MEMORY_LACK);
         buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
@@ -151,15 +151,12 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
 
-    //connect to proxy server as random mode, send plain text pkt to proxy server 
+    //connect to proxy server as random mode, send plain text pkt to proxy server
     //and wait for backward pkt from proxy server.
     from_proxy_plain_text_len = 0;
-   	ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
+    ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
                                     (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
-    //for debug
-	//memset(from_proxy_plain_text, 'X', 70);
-	//from_proxy_plain_text_len = 70;
 
     //add signature and en-crypt the backward pkt
     if(1==ret && 0< from_proxy_plain_text_len) {
@@ -171,7 +168,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
                                           (unsigned char * *) &send_terminal_cipher_text,
                                           (unsigned int *) &send_terminal_cipher_text_len);
 
-        //if we can add signature and encrypt the backward packet successfully. 
+        //if we can add signature and encrypt the backward packet successfully.
         if(1==ret && 0<send_terminal_cipher_text_len) {
             memset(buf_send_terminal, ' ', VERIFY_PKT_HEADER_LENGTH);
             memcpy(buf_send_terminal, packet, VERIFY_PKT_MSG_TYPE_LENGTH+VERIFY_PKT_TERMINAL_ID_LENGTH+VERIFY_PKT_WORKER_ID_LENGTH);
@@ -185,7 +182,6 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
                    send_terminal_cipher_text, send_terminal_cipher_text_len);
             buf_send_terminal_len = VERIFY_PKT_HEADER_LENGTH + send_terminal_cipher_text_len;
         }
-
     } else {
         OUTPUT_ERROR;
         LOG(ERROR)<<"The link with proxy server seems down.";
@@ -199,6 +195,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     //label for return.
 Do_verify_procedures_END:
+    //send the packet to terminal
     count = send( connection_sd, buf_send_terminal, buf_send_terminal_len, 0 );
     DBG("\nSend to terminal with %d bytes: |%s|\n", count, buf_send_terminal);
 
@@ -228,7 +225,7 @@ Do_verify_procedures_END:
 }
 
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Prepare_error_response_packet
  *  Description:  Generate backward packet according to the error codes.
@@ -299,7 +296,7 @@ int Prepare_error_response_packet(char *pkt, int error_code)
 }
 
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Parse_verify_pkt_header
  *  Description:  Parse the incoming packet from terminals
@@ -346,7 +343,7 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
 
 }
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Get_terminal_pub_key_from_file
  *  Description:  Get terminal public key from PEM file or Binary file
@@ -375,7 +372,7 @@ int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, VerifyPacketHeader *p
     }
 }
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Get_terminal_pub_key_from_db
  *  Description:  Connect to PostgreSQL to query the pubic key of rsa.
@@ -385,12 +382,12 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
 {
 
     int ret = 0;
+
     PGconn* conn_db = NULL;
+    PGresult *res = NULL;
+
     char * results_string = NULL;
     int  results_string_len = 0;
-
-
-    PGresult *res = NULL;
 
     char *pub_key_bin_buffer = NULL;
 
@@ -430,7 +427,7 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
     DBG("\n%s |%s|\n","Query: SQL string", query_string);
-    LOG(INFO)<<"Query: SQL string: "<<query_string;
+    DLOG(INFO)<<"Query: SQL string: "<<query_string;
 
     /* Did the record action fail in the primary database? */
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -438,8 +435,8 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
         perror(query_string);
         perror(PQerrorMessage(conn_db));
 
-        LOG(INFO)<<query_string;
-        LOG(INFO)<<PQerrorMessage(conn_db);
+        DLOG(INFO)<<query_string;
+        DLOG(INFO)<<PQerrorMessage(conn_db);
 
     }
 
@@ -451,7 +448,7 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
         results_string_len = PQgetlength(res, 0, 0);
 
         DBG("\n%s |%s|\n", "RSA Get_terminal_pub_key:", results_string);
-        LOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
+        DLOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
 
         pub_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
 
@@ -485,23 +482,105 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
 
 }
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Get_server_private_key_from_db
- *  Description:  
+ *  Description:
  * =====================================================================================
  */
-int Get_server_private_key_from_db(RSA *server_private_key)
+int Get_server_private_key_from_db(RSA *key)
 {
+
     int ret = 0;
+
+    PGconn* conn_db = NULL;
+    PGresult *res = NULL;
+
+    char * results_string = NULL;
+    int  results_string_len = 0;
+
+    char *private_key_bin_buffer = NULL;
+
+
+    //SQL string is created
+    char query_string[MAX_QUERY_LENGTH];
+    bzero(query_string,MAX_QUERY_LENGTH);
+
+    conn_db = Connect_db_server(global_par.system_par.verify_database_user[0],
+                                global_par.system_par.verify_database_password[0],
+                                global_par.system_par.verify_database_name,
+                                global_par.system_par.verify_ip_addr_array[0]);
+    if (NULL==conn_db) {
+        OUTPUT_ERROR;
+        return -1;
+    }
+
+    //generate query string
+    sprintf(query_string, "SELECT private_key FROM t_server_private_key;");
+
+    /* Send the query to primary database */
+    res = PQexec(conn_db, query_string);
+    DBG("\n%s |%s|\n","Query: SQL string", query_string);
+    DLOG(INFO)<<"Query: SQL string: "<<query_string;
+
+    /* Did the record action fail in the primary database? */
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        OUTPUT_ERROR;
+        perror(query_string);
+        perror(PQerrorMessage(conn_db));
+
+        LOG(ERROR)<<query_string;
+        LOG(ERROR)<<PQerrorMessage(conn_db);
+
+    }
+
+    /* If there are more than one records, return the first one */
+    if (PQntuples(res)>=1) {
+
+        /* Only return first tuple*/
+        results_string = PQgetvalue(res,0,0);
+        results_string_len = PQgetlength(res, 0, 0);
+
+        DBG("\n%s |%s|\n", "RSA Get_terminal_pub_key:", results_string);
+        DLOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
+
+        private_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
+
+//		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
+
+        if(NULL!=private_key_bin_buffer) {
+            key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, PUB_KEY_DER_LEN);
+            if(NULL==key) {
+                DBG("DER TO RSA, Error");
+                LOG(ERROR)<<"Terminal pubkey DER TO RSA, Error.";
+                ret = -1;
+            }
+        }
+    }
+
+    if(NULL!=private_key_bin_buffer) {
+        free(private_key_bin_buffer);
+        private_key_bin_buffer = NULL;
+    }
+
+
+    PQclear(res);
+    res = NULL;
+
+
+    /* Free the DB resource */
+    PQfinish((PGconn*)(conn_db));
+    conn_db = NULL;
+
     return ret;
+
 }
 
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Get_server_private_key_from_file
- *  Description:  
+ *  Description:
  * =====================================================================================
  */
 int Get_server_private_key_from_file(RSA **server_private_key)
@@ -536,10 +615,10 @@ int Record_pkt_regular_table( char *pkt, int pkt_size,
 
 
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  Connect_db_server
- *  Description:  
+ *  Description:
  * =====================================================================================
  */
 PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip_addr)
@@ -556,7 +635,7 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
     bzero(conn_string,COMM_LENGTH);
     sprintf(conn_string,"user=%s password=%s dbname=%s hostaddr=%s",user_name,password,db_name,ip_addr);
     DBG("Connect to DB: |%s|\n",conn_string);
-    LOG(INFO)<<"Connect to DB:" << conn_string;
+    DLOG(INFO)<<"Connect to DB:" << conn_string;
 
     /* Connect the database */
     conn = PQconnectdb(conn_string);
