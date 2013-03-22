@@ -85,7 +85,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     }
 
     //get the private key of verify server
-//    ret = Get_server_private_key_from_db(&server_private_key);
+    ret = Get_server_private_key_from_db(&server_private_key);
     ret = Get_server_private_key_from_file(&server_private_key);
     if (-1==ret) {
         OUTPUT_ERROR;
@@ -488,7 +488,7 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
  *  Description:
  * =====================================================================================
  */
-int Get_server_private_key_from_db(RSA *key)
+int Get_server_private_key_from_db(RSA **key)
 {
 
     int ret = 0;
@@ -501,22 +501,38 @@ int Get_server_private_key_from_db(RSA *key)
 
     char *private_key_bin_buffer = NULL;
 
+	int i =0;
+	time_t t = 0;
+	int verify_srv_num = 0;
+
 
     //SQL string is created
     char query_string[MAX_QUERY_LENGTH];
     bzero(query_string,MAX_QUERY_LENGTH);
 
-    conn_db = Connect_db_server(global_par.system_par.verify_database_user[0],
-                                global_par.system_par.verify_database_password[0],
+	//choose the index of a verify server at random
+    t = time(NULL);
+    srand((unsigned int) t);
+    verify_srv_num = global_par.system_par.verify_number;
+
+    if(1==verify_srv_num) {
+        i = 0;
+    } else {
+        i = 0 + (int) ( 1.0 * verify_srv_num * rand() / (RAND_MAX + 1.0));
+
+    }
+
+    conn_db = Connect_db_server(global_par.system_par.verify_database_user[i],
+                                global_par.system_par.verify_database_password[i],
                                 global_par.system_par.verify_database_name,
-                                global_par.system_par.verify_ip_addr_array[0]);
+                                global_par.system_par.verify_ip_addr_array[i]);
     if (NULL==conn_db) {
         OUTPUT_ERROR;
         return -1;
     }
 
     //generate query string
-    sprintf(query_string, "SELECT private_key FROM t_server_private_key;");
+    sprintf(query_string, "SELECT rsa_key FROM verify_srv_rsa where enable=1;");
 
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
@@ -541,18 +557,18 @@ int Get_server_private_key_from_db(RSA *key)
         results_string = PQgetvalue(res,0,0);
         results_string_len = PQgetlength(res, 0, 0);
 
-        DBG("\n%s |%s|\n", "RSA Get_terminal_pub_key:", results_string);
-        DLOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
+        DBG("\n%s |%s|\n", "RSA Get_server_pri_key:", results_string);
+        DLOG(INFO)<<"RSA Get_server_pri_key:"<<results_string;
 
         private_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
 
 //		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
 
         if(NULL!=private_key_bin_buffer) {
-            key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, PUB_KEY_DER_LEN);
-            if(NULL==key) {
+            *key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, PRI_KEY_DER_LEN);
+            if(NULL==*key) {
                 DBG("DER TO RSA, Error");
-                LOG(ERROR)<<"Terminal pubkey DER TO RSA, Error.";
+                LOG(ERROR)<<"Server_pri_key DER TO RSA, Error.";
                 ret = -1;
             }
         }

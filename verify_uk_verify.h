@@ -22,7 +22,7 @@ int Prepare_error_response_packet(char *pkt, int error_code);
 int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_header);
 
 int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header);
-int Get_server_private_key_from_db(RSA *server_private_key);
+int Get_server_private_key_from_db(RSA **server_private_key);
 
 int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, VerifyPacketHeader *pkt_hdr);
 int Get_server_private_key_from_file(RSA **server_private_key);

@@ -48,10 +48,16 @@ int Init_verify_uk_server(void)
         OUTPUT_OK;
     }
 
+	//debug
+	RSA *key = NULL;
+	ret = Get_server_private_key_from_db( &key);
+	
+	//debug end
+
     //We decide to read the private key from the PGSQL-Database when we receive a packet.
 //    DLOG(INFO)<<"Read the public key and private key of its server";
 //    printf("\nRead the public key and private key of its server:");
-    //ret = Init_server_key_pair();
+//    ret = Init_server_key_pair();
 //    if (-1 == ret ) {
 //        LOG(ERROR)<<"[!Failed]";
 //        OUTPUT_ERROR;
