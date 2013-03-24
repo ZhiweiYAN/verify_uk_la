@@ -196,7 +196,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     //label for return.
 Do_verify_procedures_END:
     //send the packet to terminal
-    count = send( connection_sd, buf_send_terminal, buf_send_terminal_len, 0 );
+    count = send(connection_sd, buf_send_terminal, buf_send_terminal_len, 0 );
     DBG("\nSend to terminal with %d bytes: |%s|\n", count, buf_send_terminal);
 
     if (0>count) {
@@ -558,7 +558,7 @@ int Get_server_private_key_from_db(RSA **key)
         results_string_len = PQgetlength(res, 0, 0);
 
         DBG("\n%s |%s|\n", "RSA Get_server_pri_key:", results_string);
-        DLOG(INFO)<<"RSA Get_server_pri_key:"<<results_string;
+        //DLOG(INFO)<<"RSA Get_server_pri_key:"<<results_string;
 
         private_key_bin_buffer = str2binary((char*)results_string, strlen( results_string ));
 
@@ -652,7 +652,6 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
     bzero(conn_string,COMM_LENGTH);
     sprintf(conn_string,"user=%s password=%s dbname=%s hostaddr=%s",user_name,password,db_name,ip_addr);
     DBG("Connect to DB: |%s|\n",conn_string);
-    DLOG(INFO)<<"Connect to DB:" << conn_string;
 
     /* Connect the database */
     conn = PQconnectdb(conn_string);

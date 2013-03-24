@@ -75,8 +75,8 @@ int SendRecv_message_to_proxy(char *msg_to_proxy,
     success = connect(proxy_sd, (struct sockaddr*)&proxy_sa, sizeof(proxy_sa));
     if(success < 0) {
         OUTPUT_ERROR;
-        LOG(ERROR)<<"failed to connect proxy server " << proxy_address_array[i] <<":"<<proxy_data_port;
-        DBG("Failed to connect proxy server %s : %d.\n", proxy_address_array[i], proxy_data_port);
+        LOG(ERROR)<<"Failed to connect proxy server " << proxy_address_array[i] <<":"<<proxy_data_port;
+        DBG("Failed to connect proxy server %s:%d.\n", proxy_address_array[i], proxy_data_port);
         close(proxy_sd);
         return -1;
     } else {

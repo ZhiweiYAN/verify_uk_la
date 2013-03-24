@@ -49,10 +49,10 @@ int Init_verify_uk_server(void)
     }
 
     //debug
-    RSA *key = NULL;
-    ret = Transform_server_private_key_from_file_into_db((char *)SERVER_PRIVATE_KEY_PEM_FILE);
-    ret = Get_server_private_key_from_db( &key);
-    return 0;
+    //RSA *key = NULL;
+    //ret = Transform_server_private_key_from_file_into_db((char *)SERVER_PRIVATE_KEY_PEM_FILE);
+    //ret = Get_server_private_key_from_db( &key);
+    //return 0;
 
     //debug end
 
