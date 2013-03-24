@@ -78,6 +78,9 @@
 
 char *base64(const unsigned char *input, int length);
 char *unbase64(unsigned char *input, int length);
+char* Binary2str(unsigned char* hex, int hex_len);
+char* str2binary( char* str, int str_len);
+
 char hex2str(unsigned char* hex, int hex_len);
 int str2hex( char* str, int str_len, void* hex, int *hex_len);
 

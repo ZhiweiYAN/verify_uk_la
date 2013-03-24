@@ -86,7 +86,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     //get the private key of verify server
     ret = Get_server_private_key_from_db(&server_private_key);
-    ret = Get_server_private_key_from_file(&server_private_key);
+    //ret = Get_server_private_key_from_file(&server_private_key, (char *)SERVER_PRIVATE_KEY_PEM_FILE);
     if (-1==ret) {
         OUTPUT_ERROR;
         LOG_ERROR("Failed to get server rsa key pair.\n");
@@ -501,16 +501,16 @@ int Get_server_private_key_from_db(RSA **key)
 
     char *private_key_bin_buffer = NULL;
 
-	int i =0;
-	time_t t = 0;
-	int verify_srv_num = 0;
+    int i =0;
+    time_t t = 0;
+    int verify_srv_num = 0;
 
 
     //SQL string is created
     char query_string[MAX_QUERY_LENGTH];
     bzero(query_string,MAX_QUERY_LENGTH);
 
-	//choose the index of a verify server at random
+    //choose the index of a verify server at random
     t = time(NULL);
     srand((unsigned int) t);
     verify_srv_num = global_par.system_par.verify_number;
@@ -560,12 +560,12 @@ int Get_server_private_key_from_db(RSA **key)
         DBG("\n%s |%s|\n", "RSA Get_server_pri_key:", results_string);
         DLOG(INFO)<<"RSA Get_server_pri_key:"<<results_string;
 
-        private_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
+        private_key_bin_buffer = str2binary((char*)results_string, strlen( results_string ));
 
 //		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
 
         if(NULL!=private_key_bin_buffer) {
-            *key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, PRI_KEY_DER_LEN);
+            *key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, strlen( results_string )*2);
             if(NULL==*key) {
                 DBG("DER TO RSA, Error");
                 LOG(ERROR)<<"Server_pri_key DER TO RSA, Error.";
@@ -599,12 +599,13 @@ int Get_server_private_key_from_db(RSA **key)
  *  Description:
  * =====================================================================================
  */
-int Get_server_private_key_from_file(RSA **server_private_key)
+int Get_server_private_key_from_file(RSA **server_private_key, char* file_name)
 {
     int ret = 0;
     RSA *key = NULL;
 
-    ret = Get_private_key_from_file(&key, (char *)"./openssl/yao_lagate.pem");
+//    ret = Get_private_key_from_file(&key, (char *)"./openssl/yao_lagate.pem");
+    ret = Get_private_key_from_file(&key, file_name);
     if(1==ret) {
         *server_private_key = key;
         return 1;
@@ -663,5 +664,139 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
     }
 
     return conn;
+}
+
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Load_server_private_key_from_file_into_db (char* file_name)
+ *  Description:
+ * =====================================================================================
+ */
+int Transform_server_private_key_from_file_into_db(char* file_name)
+{
+    int ret = 0;
+
+
+    PGconn* conn_db = NULL;
+    PGresult *res = NULL;
+
+    int i =0;
+    time_t t = 0;
+    int verify_srv_num = 0;
+
+
+//SQL string is created
+    char query_string[MAX_QUERY_LENGTH];
+    bzero(query_string,MAX_QUERY_LENGTH);
+
+    RSA *server_private_key = NULL;
+
+
+    unsigned char* srv_rsa_private_key_binary = NULL;
+    int srv_rsa_private_key_binary_len = 0;
+
+    char *srv_rsa_private_key_binary_string = NULL;
+    int srv_rsa_private_key_binary_string_len = 0;
+
+
+    //Read rsa from file with base64 format.
+    ret = Get_server_private_key_from_file(&server_private_key, file_name);
+
+    if(NULL==server_private_key) {
+        LOG(ERROR)<<"Read private key of verify server, failed." << file_name;
+        ret = 0;
+        goto load_s_p_k_return;
+    } else {
+        DLOG(INFO)<<"Read private key of verify server, success!";
+    }
+
+    //Convert rsa format into der format
+    srv_rsa_private_key_binary = Convert_rsa_to_der_for_private_key(server_private_key, &srv_rsa_private_key_binary_len);
+
+    if(NULL!=srv_rsa_private_key_binary && 0!=srv_rsa_private_key_binary_len) {
+        DLOG(INFO)<<"Convert rsa to binary, Success!";
+
+        //convert der binary format to ASIICA format.
+        srv_rsa_private_key_binary_string = Binary2str(srv_rsa_private_key_binary, srv_rsa_private_key_binary_len);
+        if(NULL!=srv_rsa_private_key_binary_string) {
+            srv_rsa_private_key_binary_string_len = srv_rsa_private_key_binary_len *2;
+            //One Byte -> 2 Numbers
+            DLOG(INFO)<<"Private key string length:" << srv_rsa_private_key_binary_string_len
+                      <<"ASIIC :" <<srv_rsa_private_key_binary_string;
+        } else {
+            ret = 0;
+            LOG(ERROR)<<"Convert rsa binary to ASIIC string, failed.";
+            goto load_s_p_k_return;
+        }
+
+
+    } else {
+        LOG(ERROR)<<"Convert rsa to binary, Failed.";
+        ret = 0;
+        goto load_s_p_k_return;
+    }
+
+
+
+//choose the index of a verify server at random
+    t = time(NULL);
+    srand((unsigned int) t);
+    verify_srv_num = global_par.system_par.verify_number;
+
+    if(1==verify_srv_num) {
+        i = 0;
+    } else {
+        i = 0 + (int) ( 1.0 * verify_srv_num * rand() / (RAND_MAX + 1.0));
+
+    }
+
+    conn_db = Connect_db_server(global_par.system_par.verify_database_user[i],
+                                global_par.system_par.verify_database_password[i],
+                                global_par.system_par.verify_database_name,
+                                global_par.system_par.verify_ip_addr_array[i]);
+    if (NULL==conn_db) {
+        OUTPUT_ERROR;
+        return -1;
+    }
+
+//generate query string
+    sprintf(query_string, "INSERT INTO verify_srv_rsa(rsa_key) values (trim(\'%s\'));", srv_rsa_private_key_binary_string);
+
+    /* Send the query to primary database */
+    res = PQexec(conn_db, query_string);
+    DBG("\n%s |%s|\n","Query: SQL string", query_string);
+    DLOG(INFO)<<"Query: SQL string: "<<query_string;
+
+    /* Did the record action fail in the primary database? */
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        OUTPUT_ERROR;
+        perror(query_string);
+        perror(PQerrorMessage(conn_db));
+
+        LOG(ERROR)<<query_string;
+        LOG(ERROR)<<PQerrorMessage(conn_db);
+
+    }
+
+load_s_p_k_return:
+    if(NULL!=server_private_key) {
+        free(server_private_key);
+        server_private_key = NULL;
+    }
+
+    if(NULL!=srv_rsa_private_key_binary) {
+        free(srv_rsa_private_key_binary);
+        srv_rsa_private_key_binary = NULL;
+        srv_rsa_private_key_binary_len = 0;
+    }
+
+    if(NULL!=srv_rsa_private_key_binary_string) {
+        free(srv_rsa_private_key_binary_string);
+        srv_rsa_private_key_binary_string = NULL;
+        srv_rsa_private_key_binary_string_len = 0;
+    }
+
+    return ret;
 }
 

@@ -23,6 +23,8 @@
 
 #define CONFIGFILENAME "../cfg_files/global.cfg"
 
+#define SERVER_PRIVATE_KEY_PEM_FILE "./openssl/yao_lagate.pem"
+
 
 /* for the common packet header */
 #define COMPANY_ID_POSITION 0

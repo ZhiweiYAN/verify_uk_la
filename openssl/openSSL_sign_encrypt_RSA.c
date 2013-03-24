@@ -59,10 +59,10 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
     }
 }
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  base64
- *  Description:  
+ *  Description:
  * =====================================================================================
  */
 char *base64(const unsigned char *input, int length)
@@ -81,7 +81,7 @@ char *base64(const unsigned char *input, int length)
     BIO_get_mem_ptr(b64, &bptr);
 
     buff = (char *)malloc(bptr->length);
-    if(NULL==buff){
+    if(NULL==buff) {
         return NULL;
     }
 
@@ -93,10 +93,10 @@ char *base64(const unsigned char *input, int length)
     return buff;
 }
 
-/* 
+/*
  * ===  FUNCTION  ======================================================================
  *         Name:  unbase64
- *  Description:  
+ *  Description:
  * =====================================================================================
  */
 char *unbase64(unsigned char *input, int length)
@@ -104,7 +104,7 @@ char *unbase64(unsigned char *input, int length)
     BIO *b64, *bmem;
 
     char *buffer = (char *)malloc(length);
-    if(NULL==buffer){
+    if(NULL==buffer) {
         return NULL;
     }
     memset(buffer, 0, length);
@@ -120,6 +120,43 @@ char *unbase64(unsigned char *input, int length)
     return buffer;
 }
 
+char* str2binary( char* str, int str_len)
+{
+    int i = 0;
+
+    char* hex = NULL;
+
+    int hex_len;
+
+    int hex_sum = str_len/2;
+
+    unsigned int * hex_value = NULL;
+    hex_value = (unsigned int *)malloc( hex_sum * sizeof(unsigned int) );
+
+    char one_value_chars[3];
+
+    for(i=0; i<hex_sum; i++) {
+        memset(one_value_chars, 0, 3);
+        memcpy(one_value_chars, str+2*i, 2);
+        *(hex_value + i) = strtol(one_value_chars, (char**) NULL, 16);
+    }
+
+    hex = (char*)malloc(hex_sum);
+
+    for (i=0; i<hex_sum; i++) {
+        memset((char*)hex+i, *(hex_value+i), 1);
+    }
+
+    hex_len =hex_sum;
+
+    if(NULL!=hex_value) {
+        free(hex_value);
+        hex_value = NULL;
+    }
+
+    return hex;
+}
+
 /* Returns the malloc buffer, and puts the size of the buffer into the integer
  * pointed to by the second argument.
  */
@@ -129,7 +166,7 @@ unsigned char *Convert_rsa_to_der_for_pub_key(RSA *rsa, int *len)
 
     *len = i2d_RSAPublicKey(rsa, NULL);
     buf = (unsigned char*)OPENSSL_malloc(*len);
-    if(NULL==buf){
+    if(NULL==buf) {
         return 0;
     }
 
@@ -144,7 +181,7 @@ unsigned char *Convert_rsa_to_der_for_private_key(RSA *rsa, int *len)
 
     *len = i2d_RSAPrivateKey(rsa, NULL);
     buf = (unsigned char*)OPENSSL_malloc(*len);
-    if(NULL==buf){
+    if(NULL==buf) {
         return 0;
     }
 
@@ -167,10 +204,9 @@ RSA *Convert_der_to_rsa_for_pub_key(unsigned char *buf, long len)
 
     rsa = d2i_RSAPublicKey(NULL, ( const unsigned char**)&p, len);
 
-    if (NULL==rsa){
+    if (NULL==rsa) {
         return NULL;
-    }
-    else{
+    } else {
         return rsa;
     }
 }
@@ -184,10 +220,9 @@ RSA *Convert_der_to_rsa_for_private_key(unsigned char *buf, long len)
 
     rsa = d2i_RSAPrivateKey(NULL, ( const unsigned char**)&p, len);
 
-    if (NULL==rsa){
+    if (NULL==rsa) {
         return NULL;
-    }
-    else{
+    } else {
         return rsa;
     }
 }
@@ -281,6 +316,34 @@ int Get_public_key_from_file(RSA **rsa, char* key_file)
     }
 }
 
+
+char* Binary2str(unsigned char* hex, int hex_len)
+{
+    int i = 0;
+//  assert(NULL!=hex);
+//  assert(NULL!=str);
+    char *str = NULL;
+    int  str_len = 0;
+
+    str_len = 2 * hex_len+1;
+    str = (char*)malloc(str_len);
+    memset(str, 0, str_len);
+
+    for(i=0; i<hex_len; i++) {
+        sprintf(str+2*i, "%02X ", ((unsigned char *) hex)[i] );
+        // printf("0x%02X ", ( (unsigned char *) hex)[i] );
+    }
+    // printf("\n");
+    if(NULL!=str) {
+        return str;
+    } else {
+        return NULL;
+    }
+
+
+}
+
+
 char hex2str(unsigned char* hex, int hex_len)
 {
     int i = 0;
@@ -289,12 +352,12 @@ char hex2str(unsigned char* hex, int hex_len)
     char *str = NULL;
     int  str_len = 0;
 
-    str_len = 3 * hex_len+1;
+    str_len = 2 * hex_len+1;
     str = (char*)malloc(str_len);
     memset(str, 0, str_len);
 
     for(i=0; i<hex_len; i++) {
-        sprintf(str+3*i, "%02X ", ((unsigned char *) hex)[i] );
+        sprintf(str+2*i, "%02X ", ((unsigned char *) hex)[i] );
         // printf("0x%02X ", ( (unsigned char *) hex)[i] );
     }
     // printf("\n");
@@ -303,7 +366,6 @@ char hex2str(unsigned char* hex, int hex_len)
         free(str);
         str = NULL;
     }
-
 
     return ' ';
 }
