@@ -164,6 +164,7 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
     int j = 0;
 
     int available_slot_sum = 0;
+    int process_life_time = 0;
     /* Check the input parameters */
     if (NULL==ptr||0>prcs_num) {
         perror("error@monitor_process.cc:Add_process_into_time_table():NULL==ptr");
@@ -174,6 +175,7 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
     for (i=0; i<prcs_num; i++) {
         if (pid==(ptr+i)->pid) {
             (ptr+i)->pid = 0;
+            process_life_time = (ptr+i)->life_time;
             (ptr+i)->life_time = 0;
             (ptr+i)->deadline = 0;
             (ptr+i)->type = NORMAL_PROCESS;
@@ -189,7 +191,7 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
             available_slot_sum ++;
         }
     }
-    printf("\r\033[36mUnRegister PID %d from slot %d, ava_slot_ratio = %d/%d \033[0m. \n",pid,i, available_slot_sum, prcs_num);
+    printf("\r\033[36mUnRegister PID %d from slot %d, life_time = %d, ava_slot_ratio = %d/%d \033[0m. \n",pid,i, process_life_time, available_slot_sum, prcs_num);
 
     return 1;
 }

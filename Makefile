@@ -33,6 +33,7 @@ OBJS=verify_uk_main.o  verify_uk_init.o \
 		shmsem.o verify_uk_start.o verify_uk_monitor_process.o  \
 		verify_uk_verify.o verify_uk_comm_proxy.o\
 		./openssl/openssl_sign_encrypt_rsa.o \
+		parse_pkt_common_header.o \
 		../config_h_c/config.o
 
 

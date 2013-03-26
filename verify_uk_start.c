@@ -175,7 +175,21 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             sleep(2);
             continue;
         }
-        printf("\r\033[32mA connection from outside has arrived.\033[0m\n");
+
+
+        char peeraddrstr[MAX_TEMP_SIZE];
+        struct sockaddr_in peer;
+        socklen_t len;
+        bzero(peeraddrstr,MAX_TEMP_SIZE);
+        ret = getpeername(connection_sd, (struct sockaddr *)&peer, &len);
+        if (ret < 0) {
+            close(connection_sd);
+            sleep(2);
+            continue;
+        }
+
+        sprintf(peeraddrstr, "%s", inet_ntoa(peer.sin_addr));
+        printf("\r\033[36mA connection from %s has arrived.\033[0m\n", peeraddrstr);
 
         //	create a independent process to monitor the process table.
         if ((pid = fork()) < 0) {
@@ -214,9 +228,9 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
 
             /* Terminal:Receiving data from terminals*/
             count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
-            DLOG(INFO)<<"Verify UK: Recv data from Terminal.";
-            DLOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
-            DBG("\nVerify UK: Recv data from Terminal:|%s|.\n",buf_recv);
+            //DLOG(INFO)<<"Verify UK: Recv data from Terminal.";
+            //DLOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
+            DBG("Verify UK: Recv (%d bytes) data from Terminal:|%s|.\n",count, buf_recv);
 
             /* Prepare the actual memory for the packet */
             packet = (char *)malloc(sizeof(char)*(count+1));

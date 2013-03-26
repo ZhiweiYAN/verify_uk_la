@@ -54,7 +54,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     bzero(buf_send_terminal, MAXPACKETSIZE);
 
     //sleep to debug option for multi-process
-    // sleep(45);
+    //sleep(45);
 
     //get verifying-packet header and parse the verifying-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
@@ -71,8 +71,8 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
 
     //get the public key of terminal
-//    ret = Get_terminal_pub_key_from_db(&terminal_pub_key, &veri_pkt_hdr);
-    ret = Get_terminal_pub_key_from_file(&terminal_pub_key, &veri_pkt_hdr);
+    ret = Get_terminal_pub_key_from_db(&terminal_pub_key, &veri_pkt_hdr);
+    //ret = Get_terminal_pub_key_from_file(&terminal_pub_key, &veri_pkt_hdr);
     if (-1==ret) {
         OUTPUT_ERROR;
         LOG_ERROR("Failed to get terminal %s:%s public rsa-key.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
@@ -197,11 +197,17 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 Do_verify_procedures_END:
     //send the packet to terminal
     count = send(connection_sd, buf_send_terminal, buf_send_terminal_len, 0 );
-    DBG("\nSend to terminal with %d bytes: |%s|\n", count, buf_send_terminal);
+    DBG("Send to terminal with %d bytes: |%s|\n", count, buf_send_terminal);
 
     if (0>count) {
         OUTPUT_ERROR;
         LOG_ERROR("Failed to send backward to terminals\n");
+    }
+
+    if(1 == Get_pkt_record_flag((char *)to_proxy_plain_text)) {
+
+        ret = Save_trans_pkt_into_backup_db(packet, packet_size, buf_send_terminal, buf_send_terminal_len);
+
     }
 
     if(NULL!=send_terminal_cipher_text) {
@@ -221,10 +227,151 @@ Do_verify_procedures_END:
         to_proxy_plain_text=NULL;
     }
 
+
+
     return 1;
 }
 
 
+int Save_trans_pkt_into_backup_db(char *cipher_forward_pkt, int cipher_forward_pkt_len, char* cipher_backward_pkt, int cipher_backward_pkt_len)
+{
+
+    int ret = 0;
+
+
+    PGconn* conn_db = NULL;
+    PGresult *res = NULL;
+
+    char *uplink_pkt_ascii = NULL;
+    char *downlink_pkt_ascii = NULL;
+
+    int i =0;
+    time_t t = 0;
+    int verify_srv_num = 0;
+    VerifyPacketHeader veri_pkt_hdr;
+
+
+//SQL string is created
+    char query_string[MAX_QUERY_LENGTH];
+    bzero(query_string,MAX_QUERY_LENGTH);
+
+
+    //get verifying-packet header and parse the verifying-packet header
+    bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
+    ret = Parse_verify_pkt_header(cipher_forward_pkt, cipher_forward_pkt_len, &veri_pkt_hdr);
+    if(-1 == ret) {
+        OUTPUT_ERROR;
+        LOG_ERROR("Failed to parse verify packet header: terminal_id=%s, worker_id=%s.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
+        return -1;
+    } else {
+        DBG("Success to parse verify packet header: terminal_id=%s, worker_id=%s.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
+    }
+
+//choose the index of a verify server at random
+    t = time(NULL);
+    srand((unsigned int) t);
+    verify_srv_num = global_par.system_par.verify_number;
+
+    if(1==verify_srv_num) {
+        i = 0;
+    } else {
+        i = 0 + (int) ( 1.0 * verify_srv_num * rand() / (RAND_MAX + 1.0));
+
+    }
+
+    conn_db = Connect_db_server(global_par.system_par.verify_database_user[i],
+                                global_par.system_par.verify_database_password[i],
+                                global_par.system_par.verify_database_name,
+                                global_par.system_par.verify_ip_addr_array[i]);
+    if (NULL==conn_db) {
+        OUTPUT_ERROR;
+        return -1;
+    }
+
+//generate query string
+    //downlink_pkt_ascii = Binary2str( (unsigned char *) cipher_backward_pkt, cipher_backward_pkt_len);
+    uplink_pkt_ascii = Binary2str( (unsigned char *) cipher_forward_pkt, cipher_forward_pkt_len);
+
+
+//    sprintf(query_string, "INSERT INTO trans_pkt_backup(terminal_id, worker_id, cipher_forward_pkt, cipher_backward_pkt) VALUES (\'%s\', \'%s\', trim(\'%s\'), trim(\'%s\'));", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id, uplink_pkt_ascii, downlink_pkt_ascii);
+    sprintf(query_string, "INSERT INTO trans_pkt_backup(terminal_id, worker_id, cipher_forward_pkt) VALUES (\'%s\', \'%s\', trim(\'%s\'));", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id,uplink_pkt_ascii);
+
+    /* Send the query to primary database */
+    res = PQexec(conn_db, query_string);
+    DBG("\n%s |%s|\n","Query: SQL string", query_string);
+    //DLOG(INFO)<<"Query: SQL string: "<<query_string;
+
+    /* Did the record action fail in the primary database? */
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        OUTPUT_ERROR;
+        perror(query_string);
+        perror(PQerrorMessage(conn_db));
+
+        LOG(ERROR)<<query_string;
+        LOG(ERROR)<<PQerrorMessage(conn_db);
+        ret = -1;
+
+    }
+
+    if(NULL!=downlink_pkt_ascii) {
+        free(downlink_pkt_ascii);
+        downlink_pkt_ascii = NULL;
+    }
+    if(NULL!=uplink_pkt_ascii) {
+        free(uplink_pkt_ascii);
+        uplink_pkt_ascii = NULL;
+    }
+
+    return ret;
+
+}
+
+//Similar to Get_import_level() functions.
+// 1 means to save it into db, 0 not.
+int Get_pkt_record_flag(char *forward_pkt_text)
+{
+    int success = 0;
+    int com_id = 0;
+    int pkt_id = 0;
+    int im_level = 0;
+    char *e = NULL;
+
+    struct CommonPacketHeader *common_pkt_header = NULL;
+
+    common_pkt_header =(struct CommonPacketHeader *) malloc(sizeof(struct CommonPacketHeader));
+    if (NULL == common_pkt_header) {
+        LOG_ERROR("malloc error when parsing Common packet header, failed");
+        return 0;
+    }
+
+    bzero(common_pkt_header,sizeof(struct CommonPacketHeader));
+
+    /* Get the forward_pkt_text header */
+    DBG("Forward_pkt_text:|%s|.\n", forward_pkt_text);
+    success = Get_common_header(forward_pkt_text, common_pkt_header);
+
+    /* Get the company id */
+    com_id = strtol(common_pkt_header->company_id,&e,10);
+
+    /*Get the service type*/
+    pkt_id = strtol(common_pkt_header->service_id,&e,10);
+
+    /* Get the important level value */
+
+    im_level = global_par.company_par_array[com_id].packet_important_level[pkt_id];
+    free(common_pkt_header);
+
+    common_pkt_header = NULL;
+
+    DBG("The importance level of the packet = %d.\n", im_level);
+
+    if (CHARGE_PKT_LEVEL==im_level||REVERSAL_PKT_LEVEL==im_level) {
+        return 1;
+    } else {
+        return 0;
+    }
+
+}
 /*
  * ===  FUNCTION  ======================================================================
  *         Name:  Prepare_error_response_packet
@@ -378,10 +525,15 @@ int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, VerifyPacketHeader *p
  *  Description:  Connect to PostgreSQL to query the pubic key of rsa.
  * =====================================================================================
  */
-int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
+int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
 {
 
     int ret = 0;
+
+    int i =0;
+    time_t t = 0;
+    int verify_srv_num = 0;
+
 
     PGconn* conn_db = NULL;
     PGresult *res = NULL;
@@ -391,7 +543,7 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
 
     char *pub_key_bin_buffer = NULL;
 
-    if(NULL==key) {
+    if(NULL==pub_key) {
         LOG(ERROR)<<"NULL==key,input parameters, failed.";
         OUTPUT_ERROR;
         return -1;
@@ -409,14 +561,28 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
 
     bzero(query_string,MAX_QUERY_LENGTH);
 
-    conn_db = Connect_db_server(global_par.system_par.verify_database_user[0],
-                                global_par.system_par.verify_database_password[0],
+    //choose the index of a verify server at random
+    t = time(NULL);
+    srand((unsigned int) t);
+    verify_srv_num = global_par.system_par.verify_number;
+
+
+    if(1==verify_srv_num) {
+        i = 0;
+    } else {
+        i = 0 + (int) ( 1.0 * verify_srv_num * rand() / (RAND_MAX + 1.0));
+
+    }
+
+    conn_db = Connect_db_server(global_par.system_par.verify_database_user[i],
+                                global_par.system_par.verify_database_password[i],
                                 global_par.system_par.verify_database_name,
-                                global_par.system_par.verify_ip_addr_array[0]);
+                                global_par.system_par.verify_ip_addr_array[i]);
     if (NULL==conn_db) {
         OUTPUT_ERROR;
         return -1;
     }
+
 
     //generate query string
     sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\';",
@@ -450,13 +616,14 @@ int Get_terminal_pub_key_from_db(RSA *key, VerifyPacketHeader *pkt_header)
         DBG("\n%s |%s|\n", "RSA Get_terminal_pub_key:", results_string);
         DLOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
 
-        pub_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
+        pub_key_bin_buffer = str2binary((char*)results_string, strlen( results_string ));
 
+//      pub_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
 //		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
 
         if(NULL!=pub_key_bin_buffer) {
-            key = Convert_der_to_rsa_for_pub_key((unsigned char*)pub_key_bin_buffer, PUB_KEY_DER_LEN);
-            if(NULL==key) {
+            *pub_key = Convert_der_to_rsa_for_pub_key((unsigned char*)pub_key_bin_buffer, PUB_KEY_DER_LEN);
+            if(NULL==*pub_key) {
                 DBG("DER TO RSA, Error");
                 LOG(ERROR)<<"Terminal pubkey DER TO RSA, Error.";
                 ret = -1;

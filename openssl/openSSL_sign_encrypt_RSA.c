@@ -47,7 +47,7 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
     const unsigned char *p_buf = (const unsigned char *)buf;
     rsa_pub_key = d2i_RSAPublicKey (NULL, &p_buf, PUB_KEY_DER_FORMAT_LEN);
 
-    LOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
+    DLOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
 
     if(NULL==rsa_pub_key) {
         //ERR_print_errors_fp(stdout);
@@ -637,7 +637,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         ctlen += l;
     }
 
-    printf("Decrypt txt: %s", decrypt+sig_len);
+    //LOG(INFO)<<"Decrypt txt: "<< hex2str(decrypt+sig_len, );
     //split the signature text and plain text
     sig_len = RSA_size(signers_pub_key_for_signature);
     sig = (unsigned char *)malloc(sig_len);
@@ -677,7 +677,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 //    //verify the signature of signer.
 //    RSA_blinding_on(signers_pub_key_for_signature, tctx_verify);
 //	ret = RSA_verify(NID_sha1, hash, SHA1_LEN, sig, RSA_size(signers_pub_key_for_signature), signers_pub_key_for_signature);
-//
+
 //    if (1!=ret){
 //        LOG(ERROR)<<"RSA verify, failed";
 //		print_rsa_error_string();
