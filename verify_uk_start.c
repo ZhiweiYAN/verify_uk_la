@@ -242,7 +242,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             //validate the length of the packet
             if(MINIMUM_TERMINAL_PKT_LEN>count) {
                 //Too small packet, invalid!
-                count = send(connection_sd, "Invalid packet.\a\0X1B\0X04", strlen("Invalid packet.\a\0X1B\0X04"), 0);
+                count = send(connection_sd, "\nWelcome to our center.\n", strlen("\nWelcome to our center.\n"), 0);
                 goto END;
             }
 
