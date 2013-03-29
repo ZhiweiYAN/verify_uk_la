@@ -48,10 +48,26 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     unsigned int from_proxy_plain_text_len = 0;
 
     VerifyPacketHeader veri_pkt_hdr;
+    struct CommonPacketHeader *common_pkt_header = NULL;
+
     RSA *terminal_pub_key = NULL;
     RSA *server_private_key = NULL;
 
+
+    if(NULL==packet || 0>=packet_size) {
+        LOG_ERROR("The pointer of pkt from terminals is NULL.\n");
+        return -1;
+    }
+
     bzero(buf_send_terminal, MAXPACKETSIZE);
+
+    common_pkt_header = (struct CommonPacketHeader *)malloc(sizeof(struct CommonPacketHeader));
+    if (NULL == common_pkt_header) {
+        LOG_ERROR("malloc memory of common_pkt_header, failed\n");
+        return -1;
+    }
+    bzero(common_pkt_header,sizeof(struct CommonPacketHeader));
+
 
     //sleep to debug option for multi-process
     //sleep(45);
@@ -114,6 +130,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
                                     &to_proxy_plain_text, &to_proxy_plain_text_len);
 
 
+    //here, we use 'if' clause instead of 'switch' because there are 'goto' clauses.
     if(1!=ret) {
         if(ERROR_DECRYPT==ret) {
             OUTPUT_ERROR;
@@ -160,8 +177,10 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     //add signature and en-crypt the backward pkt
     if(1==ret && 0< from_proxy_plain_text_len) {
+
         bzero(buf_send_terminal, MAXPACKETSIZE);
         send_terminal_cipher_text_len = 0;
+        //the variable 'send_terminal_cipher_text' memory is allocated in the function 'Sign_and_encrypt_plain_text'.
         ret = Sign_and_encrypt_plain_text(terminal_pub_key, server_private_key,
                                           (unsigned char *) from_proxy_plain_text,
                                           (unsigned int) from_proxy_plain_text_len,
@@ -183,15 +202,32 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
             buf_send_terminal_len = VERIFY_PKT_HEADER_LENGTH + send_terminal_cipher_text_len;
         }
     } else {
+
+        //if there are errors when we send pkts to the proxy server.
         OUTPUT_ERROR;
-        LOG(ERROR)<<"The link with proxy server seems down.";
+        LOG_ERROR("The link with proxy server seems down. pkt from proxy server = |%s|\n;", from_proxy_plain_text);
+        //LOG(ERROR)<<"The link with proxy server seems down.";
         Prepare_error_response_packet(buf_send_terminal, ERROR_LINK_PROXY);
         buf_send_terminal_len = strlen(buf_send_terminal);
-        goto Do_verify_procedures_END;
     }
 
-    RSA_free(terminal_pub_key);
-    RSA_free(server_private_key);
+
+    if(1 == Get_pkt_record_flag((char *)to_proxy_plain_text)) {
+
+        /* Get the common packet header */
+        // we judge whether the packet from proxy server is accepted or not.
+        if(0< from_proxy_plain_text_len) {
+            ret = Get_common_header((char *)from_proxy_plain_text, common_pkt_header);
+            DBG("Common pkt header from downlink packet  %s, %s\n", common_pkt_header->company_id, common_pkt_header->service_id);
+        } else {
+            ret = Get_common_header((char *)to_proxy_plain_text, common_pkt_header);
+            DBG("Common pkt header from uplink packet %s, %s\n", common_pkt_header->company_id, common_pkt_header->service_id);
+        }
+
+
+        ret = Save_trans_pkt_into_backup_db(common_pkt_header, packet, packet_size, buf_send_terminal, buf_send_terminal_len);
+
+    }
 
     //label for return.
 Do_verify_procedures_END:
@@ -201,13 +237,17 @@ Do_verify_procedures_END:
 
     if (0>count) {
         OUTPUT_ERROR;
-        LOG_ERROR("Failed to send backward to terminals\n");
+        LOG_ERROR("Failed to send backward to terminals.\n");
     }
 
-    if(1 == Get_pkt_record_flag((char *)to_proxy_plain_text)) {
+    if(NULL!=terminal_pub_key) {
+        RSA_free(terminal_pub_key);
+        terminal_pub_key = NULL;
+    }
+    if(NULL!=server_private_key) {
 
-        ret = Save_trans_pkt_into_backup_db(packet, packet_size, buf_send_terminal, buf_send_terminal_len);
-
+        RSA_free(server_private_key);
+        server_private_key = NULL;
     }
 
     if(NULL!=send_terminal_cipher_text) {
@@ -227,13 +267,18 @@ Do_verify_procedures_END:
         to_proxy_plain_text=NULL;
     }
 
+    if(NULL!=common_pkt_header) {
+        free(common_pkt_header);
+        common_pkt_header = NULL;
+    }
 
 
     return 1;
 }
 
 
-int Save_trans_pkt_into_backup_db(char *cipher_forward_pkt, int cipher_forward_pkt_len, char* cipher_backward_pkt, int cipher_backward_pkt_len)
+
+int Save_trans_pkt_into_backup_db(struct CommonPacketHeader *common_pkt_header, char *cipher_forward_pkt, int cipher_forward_pkt_len, char* cipher_backward_pkt, int cipher_backward_pkt_len)
 {
 
     int ret = 0;
@@ -251,6 +296,7 @@ int Save_trans_pkt_into_backup_db(char *cipher_forward_pkt, int cipher_forward_p
     VerifyPacketHeader veri_pkt_hdr;
 
 
+
 //SQL string is created
     char query_string[MAX_QUERY_LENGTH];
     bzero(query_string,MAX_QUERY_LENGTH);
@@ -266,6 +312,8 @@ int Save_trans_pkt_into_backup_db(char *cipher_forward_pkt, int cipher_forward_p
     } else {
         DBG("Success to parse verify packet header: terminal_id=%s, worker_id=%s.\n", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id);
     }
+
+
 
 //choose the index of a verify server at random
     t = time(NULL);
@@ -288,13 +336,22 @@ int Save_trans_pkt_into_backup_db(char *cipher_forward_pkt, int cipher_forward_p
         return -1;
     }
 
-//generate query string
-    //downlink_pkt_ascii = Binary2str( (unsigned char *) cipher_backward_pkt, cipher_backward_pkt_len);
+// we do check the pointer of cipher_xxxx_pkt in Binary2str function
+    downlink_pkt_ascii = Binary2str( (unsigned char *) cipher_backward_pkt, cipher_backward_pkt_len);
     uplink_pkt_ascii = Binary2str( (unsigned char *) cipher_forward_pkt, cipher_forward_pkt_len);
 
-
-//    sprintf(query_string, "INSERT INTO trans_pkt_backup(terminal_id, worker_id, cipher_forward_pkt, cipher_backward_pkt) VALUES (\'%s\', \'%s\', trim(\'%s\'), trim(\'%s\'));", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id, uplink_pkt_ascii, downlink_pkt_ascii);
-    sprintf(query_string, "INSERT INTO trans_pkt_backup(terminal_id, worker_id, cipher_forward_pkt) VALUES (\'%s\', \'%s\', trim(\'%s\'));", veri_pkt_hdr.terminal_id, veri_pkt_hdr.worker_id,uplink_pkt_ascii);
+    //generate query string
+    sprintf(query_string, "INSERT INTO trans_pkt_backup(TERMINAL_ID, WORKER_ID, COMPANY_ID, SERVICE_ID, INNER_FLAG, CONTRACT_ID, PHONE_NUMBER, MONEY, cipher_forward_pkt, cipher_backward_pkt) VALUES (\'%s\', \'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\', trim(\'%s\'), trim(\'%s\') );",
+            veri_pkt_hdr.terminal_id,
+            veri_pkt_hdr.worker_id,
+            common_pkt_header->company_id,
+            common_pkt_header->service_id,
+            common_pkt_header->inner_flag,
+            common_pkt_header->contract_id,
+            common_pkt_header->phone_number,
+            common_pkt_header->money,
+            uplink_pkt_ascii,
+            downlink_pkt_ascii);
 
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
@@ -357,7 +414,6 @@ int Get_pkt_record_flag(char *forward_pkt_text)
     pkt_id = strtol(common_pkt_header->service_id,&e,10);
 
     /* Get the important level value */
-
     im_level = global_par.company_par_array[com_id].packet_important_level[pkt_id];
     free(common_pkt_header);
 
@@ -365,10 +421,20 @@ int Get_pkt_record_flag(char *forward_pkt_text)
 
     DBG("The importance level of the packet = %d.\n", im_level);
 
-    if (CHARGE_PKT_LEVEL==im_level||REVERSAL_PKT_LEVEL==im_level) {
+    switch (im_level) {
+    case CHARGE_PKT_IMPORTANCE_LEVEL:
         return 1;
-    } else {
-        return 0;
+        break;
+    case REVERSAL_PKT_IMPORTANCE_LEVEL:
+        return 1;
+        break;
+    case QUERY_PKT_IMPORTANCE_LEVEL:
+        return 1;
+        break;
+    default:
+        return 1;
+        break;
+
     }
 
 }
@@ -585,11 +651,9 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
 
 
     //generate query string
-    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\';",
-            (char*)(pkt_header->terminal_id) );
+    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\' AND worker_id=\'%s\';",
+            (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id));
 
-//    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\'";",
-    //          (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id ));
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
     DBG("\n%s |%s|\n","Query: SQL string", query_string);
@@ -603,6 +667,12 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
 
         DLOG(INFO)<<query_string;
         DLOG(INFO)<<PQerrorMessage(conn_db);
+
+        ret = -1;
+        if(NULL!=res) {
+            PQclear(res);
+            res = NULL;
+        }
 
     }
 
@@ -629,6 +699,8 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
                 ret = -1;
             }
         }
+    } else {
+        ret = -1;
     }
 
     if(NULL!=pub_key_bin_buffer) {
@@ -636,10 +708,10 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
         pub_key_bin_buffer = NULL;
     }
 
-
-    PQclear(res);
-    res = NULL;
-
+    if(NULL!=res) {
+        PQclear(res);
+        res = NULL;
+    }
 
     /* Free the DB resource */
     PQfinish((PGconn*)(conn_db));

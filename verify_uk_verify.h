@@ -36,7 +36,7 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
 int Record_pkt_regular_table( char *pkt, int pkt_size,PGconn *conn_db, char* backward_pkt);
 
 int Get_pkt_record_flag(char *forward_pkt_text);
-int Save_trans_pkt_into_backup_db(char *cipher_forward_pkt, int cipher_forward_pkt_len, char* cipher_backward_pkt, int cipher_backward_pkt_len);
+int Save_trans_pkt_into_backup_db(struct CommonPacketHeader *common_pkt_header, char *cipher_forward_pkt, int cipher_forward_pkt_len, char* cipher_backward_pkt, int cipher_backward_pkt_len);
 
 
 

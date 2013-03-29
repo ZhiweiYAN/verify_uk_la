@@ -325,13 +325,20 @@ char* Binary2str(unsigned char* hex, int hex_len)
     char *str = NULL;
     int  str_len = 0;
 
-    str_len = 2 * hex_len+1;
-    str = (char*)malloc(str_len);
-    memset(str, 0, str_len);
+    if(NULL==hex) {
+        str_len = strlen("NULL")+1;
+        str = (char*)malloc(str_len);
+        memset(str, 0, str_len);
+        memcpy(str, "NULL", strlen("NULL"));
+    } else {
+        str_len = 2 * hex_len+1;
+        str = (char*)malloc(str_len);
+        memset(str, 0, str_len);
 
-    for(i=0; i<hex_len; i++) {
-        sprintf(str+2*i, "%02X ", ((unsigned char *) hex)[i] );
-        // printf("0x%02X ", ( (unsigned char *) hex)[i] );
+        for(i=0; i<hex_len; i++) {
+            sprintf(str+2*i, "%02X ", ((unsigned char *) hex)[i] );
+            // printf("0x%02X ", ( (unsigned char *) hex)[i] );
+        }
     }
     // printf("\n");
     if(NULL!=str) {

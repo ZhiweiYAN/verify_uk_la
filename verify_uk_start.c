@@ -135,6 +135,13 @@ int Init_verify_uk_server(void)
         };
     }
 
+    if (waitpid(pid_daemon_trans,NULL,0)!=pid_daemon_trans) {
+        LOG(ERROR)<<"Unexpected function return,pid_daemon_trans.";
+        OUTPUT_ERROR;
+    } else {
+        LOG(ERROR)<<"THE DAEMON VERIFY_UKEY MAIN PROCESS HAS EXITED NOW.";
+        printf("\r\033[32mTHE DAEMON VERIFY_UKEY MAIN PROCESS HAS EXITED NOW.\033[0m\n");
+    }
     return 1;
 }
 
@@ -189,7 +196,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
         }
 
         sprintf(peeraddrstr, "%s", inet_ntoa(peer.sin_addr));
-        printf("\r\033[36mA connection from %s has arrived.\033[0m\n", peeraddrstr);
+        printf("\r\033[36mA connection from IP %s has arrived.\033[0m\n", peeraddrstr);
 
         //	create a independent process to monitor the process table.
         if ((pid = fork()) < 0) {
@@ -232,6 +239,13 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             //DLOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
             DBG("Verify UK: Recv (%d bytes) data from Terminal:|%s|.\n",count, buf_recv);
 
+            //validate the length of the packet
+            if(MINIMUM_TERMINAL_PKT_LEN>count) {
+                //Too small packet, invalid!
+                count = send(connection_sd, "Invalid packet.\a\0X1B\0X04", strlen("Invalid packet.\a\0X1B\0X04"), 0);
+                goto END;
+            }
+
             /* Prepare the actual memory for the packet */
             packet = (char *)malloc(sizeof(char)*(count+1));
             if (NULL == packet) {
@@ -251,10 +265,14 @@ END:
             close(connection_sd);
             ret  = Remove_pid_process_table(getpid());
 
-            free(buf_recv);
-            buf_recv = NULL;
-            free(packet);
-            packet = NULL;
+            if(NULL!=buf_recv) {
+                free(buf_recv);
+                buf_recv = NULL;
+            }
+            if(NULL!=packet) {
+                free(packet);
+                packet = NULL;
+            }
 
             exit(0);
         }
