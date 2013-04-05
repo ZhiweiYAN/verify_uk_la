@@ -176,27 +176,37 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
         printf("\r\033[32mThe Verify UK Daemon Process is waiting for connections .... \033[0m\n");
 
         if (( connection_sd = accept(welcome_sd,(struct sockaddr*)sa,&len))<0) {
-            LOG(ERROR)<< "Error happens when socket function <accept> is running. We will close the socket at once and delay 2 ms and restart.";
-            OUTPUT_ERROR;
+            LOG_ERROR("Error happens when socket function <accept> is running. We will close the socket at once and delay 2 ms and restart.");
             close(connection_sd);
             sleep(2);
             continue;
         }
 
-
-        char peeraddrstr[MAX_TEMP_SIZE];
+		
+        char peeraddrstr[COMMON_LENGTH];
         struct sockaddr_in peer;
         socklen_t len;
-        bzero(peeraddrstr,MAX_TEMP_SIZE);
+        bzero(peeraddrstr,COMMON_LENGTH);
         ret = getpeername(connection_sd, (struct sockaddr *)&peer, &len);
         if (ret < 0) {
             close(connection_sd);
-            sleep(2);
+            usleep(MIN_DELAY_TIME);
             continue;
         }
 
         sprintf(peeraddrstr, "%s", inet_ntoa(peer.sin_addr));
         printf("\r\033[36mA connection from IP %s has arrived.\033[0m\n", peeraddrstr);
+		fflush(NULL);
+
+		int ava_slot_num = 0;
+		ava_slot_num = Count_available_process_slot();
+		//if (MAX_PROCESS_NUMBRER<slot_num){
+		  if(AVAILABLE_SLOT_BOTTOM_LIMIT >= ava_slot_num){
+            close(connection_sd);
+			LOG_WARNNING("System is still in good condition. But too many connections, heavy load!\n");
+            usleep(MIN_DELAY_TIME);
+            continue;
+        }			
 
         //	create a independent process to monitor the process table.
         if ((pid = fork()) < 0) {

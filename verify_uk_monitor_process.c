@@ -254,7 +254,7 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 if (0==success) {
                     printf("\n\033[32mVERIFY_PROCESS %d was killed due to its deadline (%d).\033[0m\n",(ptr+i)->pid,(ptr+i)->deadline);
                     LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was killed due to lifetime: "<<(ptr+i)->deadline;
-                    Increase_half_lifetime_record_process(ptr, prcs_num);
+                    //Increase_half_lifetime_record_process(ptr, prcs_num);
                 } else {
                     LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was not killed successfully although its lifetime expires: "<<(ptr+i)->deadline;
                     perror("VERIFY_PROCESS was killed, but kill operation faild");
@@ -321,4 +321,39 @@ void Print_current_date_time(void)
     printf(" %24.24s\r",ctime(&t));
 
 }
+
+int Count_available_process_slot(void)
+{
+    int j = 0;
+
+    struct ShareMemProcess * mem_ptr = NULL;
+    struct ChildProcessStatus *process_ptr = NULL;
+	
+    int success = 0;
+    int semid = 0;
+
+    int available_slot_sum = 0;
+	
+    semid = GetExistedSemphore(PROCESS_SHARE_ID);
+    success = AcquireAccessRight(semid);
+    mem_ptr = (struct ShareMemProcess *)MappingShareMemOwnSpace(PROCESS_SHARE_ID);
+    process_ptr = (struct ChildProcessStatus * )(mem_ptr->process_table);
+
+    /*  set the life time of the process table */
+    /* Place the pid into the table */
+	
+    for (j=0; j<MAX_PROCESS_NUMBRER; j++) {
+        if(0==(process_ptr+j)->pid) {
+            available_slot_sum ++;
+        }
+    }
+
+    /* Free memory control handler */
+    success = UnmappingShareMem((void*)mem_ptr);
+    success = ReleaseAccessRight(semid);
+
+
+    return available_slot_sum;
+}
+
 

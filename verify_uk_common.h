@@ -91,11 +91,13 @@
 #define MAX_QUERY_LENGTH 262144
 #define MAX_TEMP_SIZE   65536
 
+#define MIN_DELAY_TIME 20
 
 #define PROCESS_SHARE_ID 108
 
 #define BACKLOG 1024
 #define MAX_PROCESS_NUMBRER 1024
+#define AVAILABLE_SLOT_BOTTOM_LIMIT 1023
 
 #define DELAY_MONITOR_TIME 2
 
@@ -130,7 +132,17 @@ enum VERIFY_ERROR_CODE {
 # define DBG(format, args...)
 #endif
 
-#define LOG_ERROR(format, args...) do{ printf(format, ##args); char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(ERROR)<<info_string; free(info_string);fflush(NULL);}while(0);
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+
+#define LOG_ERROR(format, args...) do{ printf(KRED); printf(format, ##args);printf(KNRM); char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(ERROR)<<info_string; free(info_string);fflush(NULL);}while(0);
+#define LOG_WARNNING(format, args...) do{ printf(KMAG);printf(format, ##args); printf(KNRM);char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(INFO)<<info_string; free(info_string);fflush(NULL);}while(0);
 #define OUTPUT_OK do{printf("[\033[32mOK\033[0m]\n");fflush(NULL);}while(0);
 #define OUTPUT_ERROR do{ printf("[\033[31mERROR\033[0m] %s:%d,%s()\n",__FILE__, __LINE__, __FUNCTION__);fflush(NULL);}while(0);
 

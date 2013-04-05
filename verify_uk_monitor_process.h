@@ -35,5 +35,7 @@ int Set_process_life_time(pid_t pid, int life_time);
 int Increase_half_lifetime_record_process(struct ChildProcessStatus *ptr, int prcs_num);
 
 void Print_current_date_time(void);
+int Count_available_process_slot(void);
+
 
 #endif
