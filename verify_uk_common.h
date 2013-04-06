@@ -96,16 +96,16 @@
 #define PROCESS_SHARE_ID 108
 
 #define BACKLOG 1024
-#define MAX_PROCESS_NUMBRER 1024
-#define AVAILABLE_SLOT_BOTTOM_LIMIT 1023
+#define MAX_PROCESS_NUMBRER 512
+#define AVAILABLE_SLOT_BOTTOM_LIMIT 16
 
 #define DELAY_MONITOR_TIME 2
 
 #define PROCESS_LIEF_TIME_INC_MULTIPLY_FACTOR 2
-
-#define VERIFY_PROCESS_DEADLINE 300
-#define MAX_SIZE_BUFFER_RECV 524228
-#define MAXPACKETSIZE 524228
+#define MIN_TIME_SPAN_ACCEPT_RECV 8
+#define VERIFY_PROCESS_DEADLINE 120
+#define MAX_SIZE_BUFFER_RECV 262144
+#define MAXPACKETSIZE 262144
 #define COMM_LENGTH 256
 #define COMMON_LENGTH 256
 
@@ -141,8 +141,8 @@ enum VERIFY_ERROR_CODE {
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
-#define LOG_ERROR(format, args...) do{ printf(KRED); printf(format, ##args);printf(KNRM); char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(ERROR)<<info_string; free(info_string);fflush(NULL);}while(0);
-#define LOG_WARNNING(format, args...) do{ printf(KMAG);printf(format, ##args); printf(KNRM);char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(INFO)<<info_string; free(info_string);fflush(NULL);}while(0);
+#define LOG_ERROR(format, args...) do{ printf(KRED); printf(format, ##args);printf(KNRM); char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(ERROR)<<info_string; free(info_string);fflush(NULL);google::FlushLogFiles(google::ERROR);}while(0);
+#define LOG_WARNING(format, args...) do{ printf(KMAG);printf(format, ##args); printf(KNRM);char *info_string = (char*) malloc(MAXPACKETSIZE+1); bzero(info_string, MAXPACKETSIZE+1); snprintf(info_string, MAXPACKETSIZE, format, ##args); LOG(WARNING)<<info_string; free(info_string);fflush(NULL);google::FlushLogFiles(google::WARNING);}while(0);
 #define OUTPUT_OK do{printf("[\033[32mOK\033[0m]\n");fflush(NULL);}while(0);
 #define OUTPUT_ERROR do{ printf("[\033[31mERROR\033[0m] %s:%d,%s()\n",__FILE__, __LINE__, __FUNCTION__);fflush(NULL);}while(0);
 
@@ -184,6 +184,8 @@ enum ProcessType {NORMAL_PROCESS=0,VERIFY_PROCESS};
 struct ChildProcessStatus {
     pid_t pid;
     int life_time;
+	int recv_timer_stop; // 1, ture, drop it; 0: good pkt, keep it. 
+	int recv_delay_time;
     int deadline;
     enum ProcessType type;
     int process_step;

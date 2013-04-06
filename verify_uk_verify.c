@@ -1024,7 +1024,7 @@ load_s_p_k_return:
     }
 
     if(NULL!=srv_rsa_private_key_binary) {
-        free(srv_rsa_private_key_binary);
+        OPENSSL_free(srv_rsa_private_key_binary);
         srv_rsa_private_key_binary = NULL;
         srv_rsa_private_key_binary_len = 0;
     }

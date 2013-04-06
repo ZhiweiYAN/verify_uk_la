@@ -36,6 +36,7 @@ int Increase_half_lifetime_record_process(struct ChildProcessStatus *ptr, int pr
 
 void Print_current_date_time(void);
 int Count_available_process_slot(void);
+int Stop_recv_timer(pid_t pid);
 
 
 #endif

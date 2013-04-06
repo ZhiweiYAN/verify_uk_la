@@ -49,6 +49,11 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
 
     DLOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
 
+	if(NULL!=buf){
+		free(buf);
+		buf = NULL;
+	}
+		
     if(NULL==rsa_pub_key) {
         //ERR_print_errors_fp(stdout);
         *rsa = NULL;

@@ -140,6 +140,8 @@ int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs
         if (0==(ptr+i)->pid) {
             (ptr+i)->pid = pid;
             (ptr+i)->life_time = 0;
+			(ptr+i)->recv_timer_stop = 0; //default
+			(ptr+i)->recv_delay_time = 0;
             (ptr+i)->deadline = deadline;
             (ptr+i)->type = type;
             (ptr+i)->process_step = 0;
@@ -177,6 +179,8 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
             (ptr+i)->pid = 0;
             process_life_time = (ptr+i)->life_time;
             (ptr+i)->life_time = 0;
+			(ptr+i)->recv_delay_time =0;
+			(ptr+i)->recv_timer_stop = 1;
             (ptr+i)->deadline = 0;
             (ptr+i)->type = NORMAL_PROCESS;
             (ptr+i)->process_step = 0;
@@ -216,8 +220,12 @@ int Increase_process_life_time(struct ChildProcessStatus *ptr, int prcs_num)
     }
 
     for (i=0; i<prcs_num; i++) {
-        if (0!= (ptr+i)->pid)
+        if (0!= (ptr+i)->pid){
             ((ptr+i)->life_time)++;
+			if(0==(ptr+i)->recv_timer_stop){
+				((ptr+i)->recv_delay_time)++;
+			}
+        }
     }
     return 1;
 }
@@ -246,14 +254,14 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
     /* Kill all process that exceed their deadlines. */
     for (i=0; i<prcs_num; i++) {
         /* if the process belongs to the BEART HEART process */
-        if (1<(ptr+i)->pid&&(ptr+i)->deadline<(ptr+i)->life_time) {
+        if ((1<(ptr+i)->pid&&(ptr+i)->deadline<(ptr+i)->life_time)) {
             switch ((ptr+i)->type) {
             case VERIFY_PROCESS:
                 success = kill((ptr+i)->pid,SIGKILL);
                 waitpid(-1,NULL,WNOHANG);
                 if (0==success) {
-                    printf("\n\033[32mVERIFY_PROCESS %d was killed due to its deadline (%d).\033[0m\n",(ptr+i)->pid,(ptr+i)->deadline);
-                    LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was killed due to lifetime: "<<(ptr+i)->deadline;
+                    LOG_WARNING("VERIFY_PROCESS %d was killed due to its deadline (%d sec).\n",(ptr+i)->pid,(ptr+i)->deadline);
+                    //LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was killed due to lifetime: "<<(ptr+i)->deadline;
                     //Increase_half_lifetime_record_process(ptr, prcs_num);
                 } else {
                     LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was not killed successfully although its lifetime expires: "<<(ptr+i)->deadline;
@@ -263,6 +271,39 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 (ptr+i)->pid = 0;
                 (ptr+i)->life_time = 0;
                 (ptr+i)->deadline = 0;
+				(ptr+i)->recv_timer_stop =1;
+				(ptr+i)->recv_delay_time = 0;
+                (ptr+i)->type = NORMAL_PROCESS;
+                (ptr+i)->process_step = 0;
+                success = Unregister_process_from_process_table(ptr, prcs_num, (ptr+i)->pid);
+                break;
+            default:
+                break;
+            }
+            fflush(NULL);
+            google::FlushLogFiles(google::ERROR);
+            google::FlushLogFiles(google::INFO);
+            usleep(100);
+        }
+        if ((1<(ptr+i)->pid && 0==(ptr+i)->recv_timer_stop && MIN_TIME_SPAN_ACCEPT_RECV< (ptr+i)->recv_delay_time)) {
+            switch ((ptr+i)->type) {
+            case VERIFY_PROCESS:
+                success = kill((ptr+i)->pid,SIGKILL);
+                waitpid(-1,NULL,WNOHANG);
+                if (0==success) {
+                    LOG_WARNING("VERIFY_PROCESS %d was killed due to its invalid connection (%d sec).\n",(ptr+i)->pid,(ptr+i)->recv_delay_time);
+                    //LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was killed due to lifetime: "<<(ptr+i)->deadline;
+                    //Increase_half_lifetime_record_process(ptr, prcs_num);
+                } else {
+                    LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was not killed successfully although its invalid connection: "<<(ptr+i)->recv_delay_time;
+                    perror("VERIFY_PROCESS was killed, but kill operation faild");
+                    printf("\n\033[35mThe VERIFY_PROCESS %d  should be killed. But killing operation failed.\033[0m\n",(ptr+i)->pid);
+                }
+                (ptr+i)->pid = 0;
+                (ptr+i)->life_time = 0;
+                (ptr+i)->deadline = 0;
+				(ptr+i)->recv_timer_stop =1;
+				(ptr+i)->recv_delay_time = 0;
                 (ptr+i)->type = NORMAL_PROCESS;
                 (ptr+i)->process_step = 0;
                 success = Unregister_process_from_process_table(ptr, prcs_num, (ptr+i)->pid);
@@ -356,4 +397,39 @@ int Count_available_process_slot(void)
     return available_slot_sum;
 }
 
+int Stop_recv_timer(pid_t pid)
+{
+    int j = 0;
+
+    struct ShareMemProcess * mem_ptr = NULL;
+    struct ChildProcessStatus *process_ptr = NULL;
+	
+    int ret = 0;
+    int semid = 0;
+
+    semid = GetExistedSemphore(PROCESS_SHARE_ID);
+    ret = AcquireAccessRight(semid);
+    mem_ptr = (struct ShareMemProcess *)MappingShareMemOwnSpace(PROCESS_SHARE_ID);
+    process_ptr = (struct ChildProcessStatus * )(mem_ptr->process_table);
+
+    /*  set the life time of the process table */
+    /* Place the pid into the table */
+	
+    for (j=0; j<MAX_PROCESS_NUMBRER; j++) {
+        if(pid==(process_ptr+j)->pid) {
+            if(MIN_TIME_SPAN_ACCEPT_RECV<(process_ptr+j)->recv_delay_time){
+				(process_ptr+j)->recv_timer_stop = 1;
+				break;
+            }
+        }
+    }
+
+    /* Free memory control handler */
+    ret = UnmappingShareMem((void*)mem_ptr);
+    ret = ReleaseAccessRight(semid);
+
+
+    return 1;
+
+}
 
