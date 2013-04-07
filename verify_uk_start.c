@@ -182,7 +182,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             continue;
         }
 
-		
+
         char peeraddrstr[COMMON_LENGTH];
         struct sockaddr_in peer;
         socklen_t len;
@@ -196,19 +196,19 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
 
         sprintf(peeraddrstr, "%s", inet_ntoa(peer.sin_addr));
         printf("\r\033[36mA connection from IP %s has arrived.\033[0m\n", peeraddrstr);
-		fflush(NULL);
+        fflush(NULL);
 
-		int ava_slot_num = 0;
-		ava_slot_num = Count_available_process_slot();
-		//if (MAX_PROCESS_NUMBRER<slot_num){
-		  if(AVAILABLE_SLOT_BOTTOM_LIMIT >= ava_slot_num){
-		  	count = send(connection_sd, "\nheavy load!\n", strlen("\nheavy load!\n"), MSG_DONTWAIT|MSG_OOB);
+        int ava_slot_num = 0;
+        ava_slot_num = Count_available_process_slot();
+        //if (MAX_PROCESS_NUMBRER<slot_num){
+        if(AVAILABLE_SLOT_BOTTOM_LIMIT >= ava_slot_num) {
+            count = send(connection_sd, "\nheavy load!\n", strlen("\nheavy load!\n"), MSG_DONTWAIT|MSG_OOB);
             close(connection_sd);
-			LOG_WARNING("System is still in heavy load condition because of too many (%d)connections!\n", 
-				MAX_PROCESS_NUMBRER-ava_slot_num);
+            LOG_WARNING("System is still in heavy load condition because of too many (%d)connections!\n",
+                        MAX_PROCESS_NUMBRER-ava_slot_num);
             usleep(MIN_DELAY_TIME);
             continue;
-        }			
+        }
 
         //	create a independent process to monitor the process table.
         if ((pid = fork()) < 0) {
@@ -235,8 +235,8 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             /* In the grandchild process */
             /* Allocate memory for receiving data */
 
-			pid_t trans_pid = 0;
-			trans_pid = getpid();
+            pid_t trans_pid = 0;
+            trans_pid = getpid();
             ret  = Insert_pid_process_table(trans_pid,VERIFY_PROCESS_DEADLINE,VERIFY_PROCESS);
             buf_recv = (char*)malloc(sizeof(char)*MAX_SIZE_BUFFER_RECV);
             if (NULL==buf_recv) {
@@ -250,9 +250,9 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             /* Terminal:Receiving data from terminals*/
             count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
 
-			if(0<count){
-				Stop_recv_timer(trans_pid);
-			}
+            if(0<count) {
+                Stop_recv_timer(trans_pid);
+            }
             //DLOG(INFO)<<"Verify UK: Recv data from Terminal.";
             //DLOG(INFO)<<"Data Len:"<<count<<"\nData String:|"<<buf_recv<<"|";
             DBG("Verify UK: Recv (%d bytes) data from Terminal:|%s|.\n",count, buf_recv);
@@ -271,7 +271,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
                 LOG(ERROR)<<"malloc packet, failed.";
                 goto END;
             } else {
-                bzero(packet,count+1);
+                bzero(packet,sizeof(char)*(count+1));
                 memcpy(packet,buf_recv,count);
             }
 

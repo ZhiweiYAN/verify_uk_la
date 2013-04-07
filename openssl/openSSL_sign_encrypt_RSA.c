@@ -24,7 +24,11 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
 
     char *buf = NULL;
     buf = (char*)malloc(PUB_KEY_DER_FORMAT_LEN+1);
-    bzero(buf, PUB_KEY_DER_FORMAT_LEN+1);
+    if(NULL==buf) {
+        return -1;
+    } else {
+        bzero(buf, PUB_KEY_DER_FORMAT_LEN+1);
+    }
 
     FILE *fp = NULL;
     fp = fopen(file_name,"rb");
@@ -49,11 +53,11 @@ int Generate_pub_key_from_file(RSA** rsa, char* file_name)
 
     DLOG(INFO)<<hex2str((unsigned char *)buf, PUB_KEY_DER_FORMAT_LEN)<< "terminal pub_key with DER format.";
 
-	if(NULL!=buf){
-		free(buf);
-		buf = NULL;
-	}
-		
+    if(NULL!=buf) {
+        free(buf);
+        buf = NULL;
+    }
+
     if(NULL==rsa_pub_key) {
         //ERR_print_errors_fp(stdout);
         *rsa = NULL;
@@ -88,6 +92,8 @@ char *base64(const unsigned char *input, int length)
     buff = (char *)malloc(bptr->length);
     if(NULL==buff) {
         return NULL;
+    } else {
+        bzero(buff, bptr->length);
     }
 
     memcpy(buff, bptr->data, bptr->length-1);
@@ -111,6 +117,8 @@ char *unbase64(unsigned char *input, int length)
     char *buffer = (char *)malloc(length);
     if(NULL==buffer) {
         return NULL;
+    } else {
+        bzero(buffer, length);
     }
     memset(buffer, 0, length);
 
@@ -137,6 +145,11 @@ char* str2binary( char* str, int str_len)
 
     unsigned int * hex_value = NULL;
     hex_value = (unsigned int *)malloc( hex_sum * sizeof(unsigned int) );
+    if(NULL==hex_value) {
+        return NULL;
+    } else {
+        bzero(hex_value,  hex_sum * sizeof(unsigned int));
+    }
 
     char one_value_chars[3];
 
@@ -147,12 +160,18 @@ char* str2binary( char* str, int str_len)
     }
 
     hex = (char*)malloc(hex_sum);
+    if(NULL==hex) {
+        goto str2binary_END;
+    } else {
+        bzero(hex, hex_sum);
+    }
 
     for (i=0; i<hex_sum; i++) {
         memset((char*)hex+i, *(hex_value+i), 1);
     }
 
     hex_len =hex_sum;
+str2binary_END:
 
     if(NULL!=hex_value) {
         free(hex_value);
@@ -333,12 +352,21 @@ char* Binary2str(unsigned char* hex, int hex_len)
     if(NULL==hex) {
         str_len = strlen("NULL")+1;
         str = (char*)malloc(str_len);
-        memset(str, 0, str_len);
+        if(NULL==str) {
+            return NULL;
+        } else {
+            bzero(str, str_len);
+        }
+
         memcpy(str, "NULL", strlen("NULL"));
     } else {
         str_len = 2 * hex_len+1;
         str = (char*)malloc(str_len);
-        memset(str, 0, str_len);
+        if(NULL==str) {
+            return NULL;
+        } else {
+            bzero(str, str_len);
+        }
 
         for(i=0; i<hex_len; i++) {
             sprintf(str+2*i, "%02X ", ((unsigned char *) hex)[i] );
@@ -390,6 +418,12 @@ int str2hex( char* str, int str_len, void* hex, int *hex_len)
 
     unsigned int * hex_value = NULL;
     hex_value = (unsigned int *)malloc( hex_sum * sizeof(unsigned int) );
+
+    if(NULL==hex) {
+        return -1;
+    } else {
+        bzero(hex_value, hex_sum * sizeof(unsigned int) );
+    }
 
     char one_value_chars[3];
 
@@ -659,6 +693,7 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         goto err;
     } else {
         // memcpy(sig, decrypt+ctlen-sig_len, sig_len);
+        bzero(sig, sig_len);
         memcpy(sig, decrypt, sig_len);
         DLOG(INFO)<<"signature_len:"<<sig_len<<hex2str(sig,sig_len);
     }
@@ -666,11 +701,13 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 
     *plain_text_len = ctlen - sig_len;
     *plain_text = (unsigned char *)malloc(*plain_text_len);
+    bzero(*plain_text, *plain_text_len);
     if(NULL==*plain_text) {
         LOG(ERROR)<<"malloc, failed";
         ret = -1;
         goto err;
     } else {
+        bzero(*plain_text, *plain_text_len);
         memcpy(*plain_text, decrypt+sig_len,  *plain_text_len);
         DLOG(INFO)<<"output, plain_text_len: "<<*plain_text_len;
         DLOG(INFO)<<"output, plain_text: |"<<*plain_text <<"|";

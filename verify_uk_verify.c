@@ -65,8 +65,9 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     if (NULL == common_pkt_header) {
         LOG_ERROR("malloc memory of common_pkt_header, failed\n");
         return -1;
+    } else {
+        bzero(common_pkt_header,sizeof(struct CommonPacketHeader));
     }
-    bzero(common_pkt_header,sizeof(struct CommonPacketHeader));
 
 
     //sleep to debug option for multi-process
@@ -164,9 +165,9 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         Prepare_error_response_packet(buf_send_terminal, ERROR_MEMORY_LACK);
         buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
+    } else {
+        bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
     }
-
-    bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
 
     //connect to proxy server as random mode, send plain text pkt to proxy server
     //and wait for backward pkt from proxy server.

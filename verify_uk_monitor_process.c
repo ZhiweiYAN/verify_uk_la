@@ -140,8 +140,8 @@ int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs
         if (0==(ptr+i)->pid) {
             (ptr+i)->pid = pid;
             (ptr+i)->life_time = 0;
-			(ptr+i)->recv_timer_stop = 0; //default
-			(ptr+i)->recv_delay_time = 0;
+            (ptr+i)->recv_timer_stop = 0; //default
+            (ptr+i)->recv_delay_time = 0;
             (ptr+i)->deadline = deadline;
             (ptr+i)->type = type;
             (ptr+i)->process_step = 0;
@@ -179,8 +179,8 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
             (ptr+i)->pid = 0;
             process_life_time = (ptr+i)->life_time;
             (ptr+i)->life_time = 0;
-			(ptr+i)->recv_delay_time =0;
-			(ptr+i)->recv_timer_stop = 1;
+            (ptr+i)->recv_delay_time =0;
+            (ptr+i)->recv_timer_stop = 1;
             (ptr+i)->deadline = 0;
             (ptr+i)->type = NORMAL_PROCESS;
             (ptr+i)->process_step = 0;
@@ -220,11 +220,11 @@ int Increase_process_life_time(struct ChildProcessStatus *ptr, int prcs_num)
     }
 
     for (i=0; i<prcs_num; i++) {
-        if (0!= (ptr+i)->pid){
+        if (0!= (ptr+i)->pid) {
             ((ptr+i)->life_time)++;
-			if(0==(ptr+i)->recv_timer_stop){
-				((ptr+i)->recv_delay_time)++;
-			}
+            if(0==(ptr+i)->recv_timer_stop) {
+                ((ptr+i)->recv_delay_time)++;
+            }
         }
     }
     return 1;
@@ -271,8 +271,8 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 (ptr+i)->pid = 0;
                 (ptr+i)->life_time = 0;
                 (ptr+i)->deadline = 0;
-				(ptr+i)->recv_timer_stop =1;
-				(ptr+i)->recv_delay_time = 0;
+                (ptr+i)->recv_timer_stop =1;
+                (ptr+i)->recv_delay_time = 0;
                 (ptr+i)->type = NORMAL_PROCESS;
                 (ptr+i)->process_step = 0;
                 success = Unregister_process_from_process_table(ptr, prcs_num, (ptr+i)->pid);
@@ -302,8 +302,8 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 (ptr+i)->pid = 0;
                 (ptr+i)->life_time = 0;
                 (ptr+i)->deadline = 0;
-				(ptr+i)->recv_timer_stop =1;
-				(ptr+i)->recv_delay_time = 0;
+                (ptr+i)->recv_timer_stop =1;
+                (ptr+i)->recv_delay_time = 0;
                 (ptr+i)->type = NORMAL_PROCESS;
                 (ptr+i)->process_step = 0;
                 success = Unregister_process_from_process_table(ptr, prcs_num, (ptr+i)->pid);
@@ -369,12 +369,12 @@ int Count_available_process_slot(void)
 
     struct ShareMemProcess * mem_ptr = NULL;
     struct ChildProcessStatus *process_ptr = NULL;
-	
+
     int success = 0;
     int semid = 0;
 
     int available_slot_sum = 0;
-	
+
     semid = GetExistedSemphore(PROCESS_SHARE_ID);
     success = AcquireAccessRight(semid);
     mem_ptr = (struct ShareMemProcess *)MappingShareMemOwnSpace(PROCESS_SHARE_ID);
@@ -382,7 +382,7 @@ int Count_available_process_slot(void)
 
     /*  set the life time of the process table */
     /* Place the pid into the table */
-	
+
     for (j=0; j<MAX_PROCESS_NUMBRER; j++) {
         if(0==(process_ptr+j)->pid) {
             available_slot_sum ++;
@@ -403,7 +403,7 @@ int Stop_recv_timer(pid_t pid)
 
     struct ShareMemProcess * mem_ptr = NULL;
     struct ChildProcessStatus *process_ptr = NULL;
-	
+
     int ret = 0;
     int semid = 0;
 
@@ -414,12 +414,12 @@ int Stop_recv_timer(pid_t pid)
 
     /*  set the life time of the process table */
     /* Place the pid into the table */
-	
+
     for (j=0; j<MAX_PROCESS_NUMBRER; j++) {
         if(pid==(process_ptr+j)->pid) {
-            if(MIN_TIME_SPAN_ACCEPT_RECV<(process_ptr+j)->recv_delay_time){
-				(process_ptr+j)->recv_timer_stop = 1;
-				break;
+            if(MIN_TIME_SPAN_ACCEPT_RECV<(process_ptr+j)->recv_delay_time) {
+                (process_ptr+j)->recv_timer_stop = 1;
+                break;
             }
         }
     }

@@ -184,8 +184,8 @@ enum ProcessType {NORMAL_PROCESS=0,VERIFY_PROCESS};
 struct ChildProcessStatus {
     pid_t pid;
     int life_time;
-	int recv_timer_stop; // 1, ture, drop it; 0: good pkt, keep it. 
-	int recv_delay_time;
+    int recv_timer_stop; // 1, ture, drop it; 0: good pkt, keep it.
+    int recv_delay_time;
     int deadline;
     enum ProcessType type;
     int process_step;

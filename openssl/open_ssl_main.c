@@ -122,7 +122,7 @@ int main(void)
     ret = Generate_pub_key_from_file(&rsa, (char *)"GZ002312_1005_pubkey.bin");
 //    ret = Get_private_key_from_file(&rsa, (char *)"terminal_pub_key.dat");
 //    ret = Save_private_key_to_file(rsa, (char *)"pri_keyfile.txt");
-   return 1;
+    return 1;
 
     Remove_private_key(rsa);
 
