@@ -397,7 +397,7 @@ char hex2str(unsigned char* hex, int hex_len)
     memset(str, 0, str_len);
 
     for(i=0; i<hex_len; i++) {
-        sprintf(str+2*i, "%02X ", ((unsigned char *) hex)[i] );
+        sprintf(str+2*i, "%02X", ((unsigned char *) hex)[i] );
         // printf("0x%02X ", ( (unsigned char *) hex)[i] );
     }
     // printf("\n");

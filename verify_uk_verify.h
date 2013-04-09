@@ -29,6 +29,7 @@ int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, VerifyPacketHeader *p
 int Get_server_private_key_from_file(RSA **server_private_key, char *file_name);
 
 int Transform_server_private_key_from_file_into_db(char* file_name);
+int Transform_terminal_public_key_from_file_into_db(char* file_name);
 
 PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip_addr);
 

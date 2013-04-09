@@ -75,6 +75,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     //get verifying-packet header and parse the verifying-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
+    memset(buf_send_terminal,' ', VERIFY_PKT_HEADER_LENGTH);
     ret = Parse_verify_pkt_header(packet, packet_size, &veri_pkt_hdr);
     if(-1 == ret) {
         OUTPUT_ERROR;
@@ -172,9 +173,14 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     //connect to proxy server as random mode, send plain text pkt to proxy server
     //and wait for backward pkt from proxy server.
     from_proxy_plain_text_len = 0;
-    ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
-                                    (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
+    //ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
+    //                                (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
+    //begin debug
+    ret = 1;
+    from_proxy_plain_text_len = 16;
+    memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
+    //end debug
 
     //add signature and en-crypt the backward pkt
     if(1==ret && 0< from_proxy_plain_text_len) {
@@ -189,6 +195,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
                                           (unsigned int *) &send_terminal_cipher_text_len);
 
         //if we can add signature and encrypt the backward packet successfully.
+        memset(buf_send_terminal, 0, buf_send_terminal_len);
         if(1==ret && 0<send_terminal_cipher_text_len) {
             memset(buf_send_terminal, ' ', VERIFY_PKT_HEADER_LENGTH);
             memcpy(buf_send_terminal, packet, VERIFY_PKT_MSG_TYPE_LENGTH+VERIFY_PKT_TERMINAL_ID_LENGTH+VERIFY_PKT_WORKER_ID_LENGTH);
@@ -210,6 +217,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         //LOG(ERROR)<<"The link with proxy server seems down.";
         Prepare_error_response_packet(buf_send_terminal, ERROR_LINK_PROXY);
         buf_send_terminal_len = strlen(buf_send_terminal);
+        //if link down, we also record the trans, Not goto Do_verify_procedures_END;
     }
 
 
@@ -452,50 +460,49 @@ int Prepare_error_response_packet(char *pkt, int error_code)
     // all default values for the following fields are spaces.
     memset(pkt, ' ', VERIFY_PKT_HEADER_LENGTH);
 
-
     //Attation plz: the length of msg memo must be less than 45 characters.
     switch (error_code) {
     case ERROR_DECRYPT:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "1", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "decrypt cipher with srv_private_key, error!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "01", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "decrypt cipher with srv_private_key, error!",
+               strlen("decrypt cipher with srv_private_key, error!"));
         break;
     case ERROR_VALIDATE_SIGN:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "2", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "validate term_pkt with ukey_pub_key, error!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "02", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "validate term_pkt with ukey_pub_key, error!",
+               strlen("validate term_pkt with ukey_pub_key, error!"));
         break;
     case ERROR_LINK_PROXY:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "3", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "connect to proxy srv, link down!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "03", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "connect to proxy srv, link down!",
+               strlen("connect to proxy srv, link down!"));
         break;
     case ERROR_INCOMPLETE_PKT:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "4", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "parse verify_pkt header, incomplete!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "04", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "parse verify_pkt header, incomplete!",
+               strlen("parse verify_pkt header, incomplete!"));
         break;
     case ERROR_NO_TERMINAL_RSA_PUBKEY:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "5", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "find terminal ukey_pub_key, nothing!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "05", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "find terminal ukey_pub_key, nothing!",
+               strlen("find terminal ukey_pub_key, nothing!"));
         break;
     case ERROR_NO_SRV_RSA_PRIKEY:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "6", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "while finding server ukey rsa_private_key, error!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "06", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "while finding server ukey rsa_private_key, error!",
+               strlen("while finding server ukey rsa_private_key, error!"));
         break;
     case ERROR_MEMORY_LACK:
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "7", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
-        strncpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-                "server memory, not enough!",
-                VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "07", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
+               "server memory, not enough!",
+               strlen("server memory, not enough!"));
         break;
 
     default:
@@ -563,19 +570,13 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
  *  Description:  Get terminal public key from PEM file or Binary file
  * =====================================================================================
  */
-int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, VerifyPacketHeader *pkt_hdr)
+int Get_terminal_pub_key_from_file(RSA **terminal_pub_key, char* file_name)
 {
     int ret = 0;
 
     RSA * pub_key = NULL;
 
-    //Generate the file name with the format PEM or Binary.
-    char pem_filename[COMMON_LENGTH];
-    bzero(pem_filename, COMMON_LENGTH);
-
-    snprintf(pem_filename, COMMON_LENGTH, "%s_%s_pubkey.bin", pkt_hdr->terminal_id, pkt_hdr->worker_id);
-
-    ret =  Generate_pub_key_from_file( &pub_key, pem_filename);
+    ret =  Generate_pub_key_from_file( &pub_key, file_name);
     //ret = Get_public_key_from_file(&pub_key, pem_filename);
     if(-1==ret) {
         *terminal_pub_key = NULL;
@@ -1038,4 +1039,139 @@ load_s_p_k_return:
 
     return ret;
 }
+
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  Load_server_private_key_from_file_into_db (char* file_name)
+ *  Description:
+ * =====================================================================================
+ */
+int Transform_terminal_public_key_from_file_into_db(char* file_name)
+{
+    int ret = 0;
+
+
+    PGconn* conn_db = NULL;
+    PGresult *res = NULL;
+
+    int i =0;
+    time_t t = 0;
+    int verify_srv_num = 0;
+
+
+    //SQL string is created
+    char query_string[MAX_QUERY_LENGTH];
+    bzero(query_string,MAX_QUERY_LENGTH);
+
+    RSA *terminal_public_key = NULL;
+
+
+    unsigned char* terminal_rsa_public_key_binary = NULL;
+    int terminal_rsa_public_key_binary_len = 0;
+
+    char *terminal_rsa_public_key_binary_string = NULL;
+    int terminal_rsa_public_key_binary_string_len = 0;
+
+
+    //Read rsa from file with base64 format.
+    ret = Get_terminal_pub_key_from_file(&terminal_public_key, file_name);
+
+    if(NULL==terminal_public_key) {
+        LOG(ERROR)<<"Read private key of verify server, failed." << file_name;
+        ret = 0;
+        goto load_s_p_k_return;
+    } else {
+        DLOG(INFO)<<"Read private key of verify server, success!";
+    }
+
+    //Convert rsa format into der format
+    terminal_rsa_public_key_binary = Convert_rsa_to_der_for_pub_key(terminal_public_key, &terminal_rsa_public_key_binary_len);
+
+    if(NULL!=terminal_rsa_public_key_binary && 0!=terminal_rsa_public_key_binary_len) {
+        DLOG(INFO)<<"Convert rsa to binary, Success!";
+
+        //convert der binary format to ASIICA format.
+        terminal_rsa_public_key_binary_string = Binary2str(terminal_rsa_public_key_binary, terminal_rsa_public_key_binary_len);
+        if(NULL!=terminal_rsa_public_key_binary_string) {
+            terminal_rsa_public_key_binary_string_len = terminal_rsa_public_key_binary_len *2;
+            //One Byte -> 2 Numbers
+            DLOG(INFO)<<"Pulic key string length:" << terminal_rsa_public_key_binary_string_len
+                      <<"ASIIC :" <<terminal_rsa_public_key_binary_string;
+        } else {
+            ret = 0;
+            LOG(ERROR)<<"Convert rsa binary to ASIIC string, failed.";
+            goto load_s_p_k_return;
+        }
+
+
+    } else {
+        LOG(ERROR)<<"Convert rsa to binary, Failed.";
+        ret = 0;
+        goto load_s_p_k_return;
+    }
+
+
+
+    //choose the index of a verify server at random
+    t = time(NULL);
+    srand((unsigned int) t);
+    verify_srv_num = global_par.system_par.verify_number;
+
+    if(1==verify_srv_num) {
+        i = 0;
+    } else {
+        i = 0 + (int) ( 1.0 * verify_srv_num * rand() / (RAND_MAX + 1.0));
+
+    }
+
+    conn_db = Connect_db_server(global_par.system_par.verify_database_user[i],
+                                global_par.system_par.verify_database_password[i],
+                                global_par.system_par.verify_database_name,
+                                global_par.system_par.verify_ip_addr_array[i]);
+    if (NULL==conn_db) {
+        OUTPUT_ERROR;
+        return -1;
+    }
+
+    //generate query string
+    sprintf(query_string, "INSERT INTO t_terminal_ukey_pubkey(pub_key) values (trim(\'%s\'));", terminal_rsa_public_key_binary_string);
+
+    /* Send the query to primary database */
+    res = PQexec(conn_db, query_string);
+    DBG("\n%s |%s|\n","Query: SQL string", query_string);
+    DLOG(INFO)<<"Query: SQL string: "<<query_string;
+
+    /* Did the record action fail in the primary database? */
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        OUTPUT_ERROR;
+        perror(query_string);
+        perror(PQerrorMessage(conn_db));
+
+        LOG(ERROR)<<query_string;
+        LOG(ERROR)<<PQerrorMessage(conn_db);
+
+    }
+
+load_s_p_k_return:
+    if(NULL!=terminal_public_key) {
+        free(terminal_public_key);
+        terminal_public_key = NULL;
+    }
+
+    if(NULL!=terminal_rsa_public_key_binary) {
+        OPENSSL_free(terminal_rsa_public_key_binary);
+        terminal_rsa_public_key_binary = NULL;
+        terminal_rsa_public_key_binary_len = 0;
+    }
+
+    if(NULL!=terminal_rsa_public_key_binary_string) {
+        free(terminal_rsa_public_key_binary_string);
+        terminal_rsa_public_key_binary_string = NULL;
+        terminal_rsa_public_key_binary_string_len = 0;
+    }
+
+    return ret;
+}
+
 
