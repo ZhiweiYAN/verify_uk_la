@@ -80,16 +80,33 @@
 #define VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH 2
 
 #define VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION 16
-#define VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH 44
+#define VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH 42
 
-#define VERIFY_PKT_PAYLOAD_LEN_POSITION 60
-#define VERIFY_PKT_PAYLOAD_LEN_LENGTH 4
+#define VERIFY_PKT_PAYLOAD_LEN_POSITION 58
+#define VERIFY_PKT_PAYLOAD_LEN_LENGTH 6
 
 #define VERIFY_PKT_HEADER_LENGTH (VERIFY_PKT_MSG_TYPE_LENGTH + VERIFY_PKT_TERMINAL_ID_LENGTH + VERIFY_PKT_WORKER_ID_LENGTH \
     +VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH \
     +VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH \
     +VERIFY_PKT_PAYLOAD_LEN_LENGTH)
 
+#define INNER_ERROR_CODE "51"
+#define ERROR_DECRYPT_INFO "服务器私钥解密错."
+#define ERROR_INCOMPLETE_PKT_INFO "验证包不完整."
+#define ERROR_VALIDATE_SIGN_INFO "验终端签名错."
+#define ERROR_LINK_PROXY_INFO "代理机通信中断."
+#define ERROR_NO_SRV_RSA_PRIKEY_INFO "无服务器私钥."
+#define ERROR_NO_TERMINAL_RSA_PUBKEY_INFO "无终端公钥."
+#define ERROR_MEMORY_LACK_INFO "服务器内存不足."
+/*
+#define ERROR_DECRYPT_INFO "decrypt cipher with srv_private_key, error!"
+#define ERROR_INCOMPLETE_PKT_INFO "parse verify_pkt header, incomplete!"
+#define ERROR_VALIDATE_SIGN_INFO "validate term_pkt with ukey_pub_key, error!"
+#define ERROR_LINK_PROXY_INFO "connect to proxy srv, link down!"
+#define ERROR_NO_SRV_RSA_PRIKEY_INFO "while finding server ukey rsa_private_key, error!"
+#define ERROR_NO_TERMINAL_RSA_PUBKEY_INFO "find terminal ukey_pub_key, nothing!"
+#define ERROR_MEMORY_LACK_INFO "server memory, not enough!"
+*/
 
 #define MAX_QUERY_LENGTH 262144
 #define MAX_TEMP_SIZE   65536
@@ -178,7 +195,7 @@ struct VerifyPacketHeader {
     char worker_id[VERIFY_PKT_WORKER_ID_LENGTH+1];
     char rsp_memo_type[VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH+1];
     char rsp_memo_txt[VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH+1];
-    int payload_len;
+    char payload_len[VERIFY_PKT_PAYLOAD_LEN_LENGTH+1];;
 };
 
 

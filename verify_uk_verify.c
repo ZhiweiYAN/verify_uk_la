@@ -75,7 +75,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     //get verifying-packet header and parse the verifying-packet header
     bzero(&veri_pkt_hdr, sizeof(VerifyPacketHeader));
-    memset(buf_send_terminal,' ', VERIFY_PKT_HEADER_LENGTH);
+    memset(buf_send_terminal,' ', VERIFY_PKT_HEADER_LENGTH+COMMON_PACKET_HEADER_LENGTH);
     ret = Parse_verify_pkt_header(packet, packet_size, &veri_pkt_hdr);
     if(-1 == ret) {
         OUTPUT_ERROR;
@@ -116,7 +116,8 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     }
 
     cipher_text = (unsigned char *)packet + VERIFY_PKT_HEADER_LENGTH;
-    cipher_text_len = (unsigned int) (veri_pkt_hdr.payload_len);
+    cipher_text_len = packet_size - VERIFY_PKT_HEADER_LENGTH;
+	//(unsigned int) (veri_pkt_hdr.payload_len);
     to_proxy_plain_text = NULL;
     to_proxy_plain_text_len = 0;
 
@@ -173,13 +174,13 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     //connect to proxy server as random mode, send plain text pkt to proxy server
     //and wait for backward pkt from proxy server.
     from_proxy_plain_text_len = 0;
-    //ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
-    //                                (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
+    ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
+                                    (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
     //begin debug
-    ret = 1;
-    from_proxy_plain_text_len = 16;
-    memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
+    //ret = 1;
+    //from_proxy_plain_text_len = 16;
+    //memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
     //end debug
 
     //add signature and en-crypt the backward pkt
@@ -197,13 +198,16 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         //if we can add signature and encrypt the backward packet successfully.
         memset(buf_send_terminal, 0, buf_send_terminal_len);
         if(1==ret && 0<send_terminal_cipher_text_len) {
-            memset(buf_send_terminal, ' ', VERIFY_PKT_HEADER_LENGTH);
+            memset(buf_send_terminal, '0', VERIFY_PKT_HEADER_LENGTH);
             memcpy(buf_send_terminal, packet, VERIFY_PKT_MSG_TYPE_LENGTH+VERIFY_PKT_TERMINAL_ID_LENGTH+VERIFY_PKT_WORKER_ID_LENGTH);
-            strncpy(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "0", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+            memset(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, '0', VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
             strncpy(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                     "SUCCESS",VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
+			
+			char cipher_text_len_str[VERIFY_PKT_PAYLOAD_LEN_LENGTH+1];
+			snprintf(cipher_text_len_str, VERIFY_PKT_PAYLOAD_LEN_LENGTH, "%06d", send_terminal_cipher_text_len);
             memcpy(buf_send_terminal+VERIFY_PKT_PAYLOAD_LEN_POSITION,
-                   &send_terminal_cipher_text_len,
+                   cipher_text_len_str,
                    VERIFY_PKT_PAYLOAD_LEN_LENGTH);
             memcpy(buf_send_terminal+VERIFY_PKT_HEADER_LENGTH,
                    send_terminal_cipher_text, send_terminal_cipher_text_len);
@@ -456,53 +460,73 @@ int Get_pkt_record_flag(char *forward_pkt_text)
 int Prepare_error_response_packet(char *pkt, int error_code)
 {
     int ret = 0;
+	char *common_pkt_erro_code = NULL;
+	char *common_pkt_erro_info = NULL;
 
     // all default values for the following fields are spaces.
     memset(pkt, ' ', VERIFY_PKT_HEADER_LENGTH);
 
+    common_pkt_erro_info = pkt + VERIFY_PKT_HEADER_LENGTH + ERROR_MEMO_POSITION;
+	common_pkt_erro_code = pkt + VERIFY_PKT_HEADER_LENGTH + INNER_SUCCESS_FLAG_POSITION;
+	
+	//memcpy(common_pkt_erro_code, INNER_ERROR_CODE, INNER_SUCCESS_FLAG_LENGTH);
     //Attation plz: the length of msg memo must be less than 45 characters.
     switch (error_code) {
     case ERROR_DECRYPT:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "01", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"01", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "decrypt cipher with srv_private_key, error!",
-               strlen("decrypt cipher with srv_private_key, error!"));
+               ERROR_DECRYPT_INFO,
+               strlen(ERROR_DECRYPT_INFO));
+		//memcpy(common_pkt_erro_info, ERROR_DECRYPT_INFO, strlen(ERROR_DECRYPT_INFO));
         break;
     case ERROR_VALIDATE_SIGN:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "02", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"02", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "validate term_pkt with ukey_pub_key, error!",
-               strlen("validate term_pkt with ukey_pub_key, error!"));
-        break;
+               ERROR_VALIDATE_SIGN_INFO,
+               strlen(ERROR_VALIDATE_SIGN_INFO));		
+		//memcpy(common_pkt_erro_info, ERROR_VALIDATE_SIGN_INFO, strlen(ERROR_VALIDATE_SIGN_INFO));
+		break;
     case ERROR_LINK_PROXY:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "03", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"03", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "connect to proxy srv, link down!",
-               strlen("connect to proxy srv, link down!"));
+               ERROR_LINK_PROXY_INFO,
+               strlen(ERROR_LINK_PROXY_INFO));
+		//memcpy(common_pkt_erro_info, ERROR_LINK_PROXY_INFO, strlen(ERROR_LINK_PROXY_INFO));
         break;
     case ERROR_INCOMPLETE_PKT:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "04", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"04", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "parse verify_pkt header, incomplete!",
-               strlen("parse verify_pkt header, incomplete!"));
+               ERROR_INCOMPLETE_PKT_INFO,
+               strlen(ERROR_INCOMPLETE_PKT_INFO));
+		//memcpy(common_pkt_erro_info, ERROR_INCOMPLETE_PKT_INFO, strlen(ERROR_INCOMPLETE_PKT_INFO));
         break;
     case ERROR_NO_TERMINAL_RSA_PUBKEY:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "05", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"05", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "find terminal ukey_pub_key, nothing!",
-               strlen("find terminal ukey_pub_key, nothing!"));
+               ERROR_NO_TERMINAL_RSA_PUBKEY_INFO,
+               strlen(ERROR_NO_TERMINAL_RSA_PUBKEY_INFO));
+		//memcpy(common_pkt_erro_info, ERROR_NO_TERMINAL_RSA_PUBKEY_INFO, strlen(ERROR_NO_TERMINAL_RSA_PUBKEY_INFO));
         break;
     case ERROR_NO_SRV_RSA_PRIKEY:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "06", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"06", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "while finding server ukey rsa_private_key, error!",
-               strlen("while finding server ukey rsa_private_key, error!"));
+               ERROR_NO_SRV_RSA_PRIKEY_INFO,
+               strlen(ERROR_NO_SRV_RSA_PRIKEY_INFO));
+		//memcpy(common_pkt_erro_info, ERROR_NO_SRV_RSA_PRIKEY_INFO, strlen(ERROR_NO_SRV_RSA_PRIKEY_INFO));
         break;
     case ERROR_MEMORY_LACK:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, "07", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
+			"07", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
-               "server memory, not enough!",
-               strlen("server memory, not enough!"));
+               ERROR_MEMORY_LACK_INFO,
+               strlen(ERROR_MEMORY_LACK_INFO));
+		//memcpy(common_pkt_erro_info, ERROR_MEMORY_LACK_INFO, strlen(ERROR_MEMORY_LACK_INFO));
         break;
 
     default:
@@ -547,18 +571,21 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     memcpy(pkt_header->worker_id, pkt+VERIFY_PKT_WORKER_ID_POSITION, VERIFY_PKT_WORKER_ID_LENGTH);
     memcpy(pkt_header->rsp_memo_type, pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION);
     memcpy(pkt_header->rsp_memo_txt, pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION, VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
-    memcpy(&(pkt_header->payload_len), pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
+    memcpy(pkt_header->payload_len, pkt+VERIFY_PKT_PAYLOAD_LEN_POSITION, VERIFY_PKT_PAYLOAD_LEN_LENGTH);
 
-    DBG("Payload bytes: %d, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
+    DBG("Payload bytes: %s, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
 
     //Examine the packet length whether it is valid or not.
-    if(pkt_header->payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
+    int payload_len = 0;
+	payload_len = atoi(pkt_header->payload_len);
+    if(payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
 
         //Good
         return 1;
     } else {
 
         //Bad
+		LOG_ERROR("Payload bytes: %s, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
         return -1;
     }
 
