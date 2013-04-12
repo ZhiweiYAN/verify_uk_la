@@ -195,7 +195,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
         }
 
         sprintf(peeraddrstr, "%s", inet_ntoa(peer.sin_addr));
-        printf("\r\033[36mA connection from IP %s has arrived.\033[0m\n", peeraddrstr);
+        printf("\n\n\033[36mA connection from IP %s has arrived.\033[0m\n", peeraddrstr);
         fflush(NULL);
 
         int ava_slot_num = 0;
@@ -250,6 +250,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             /* Terminal:Receiving data from terminals*/
             count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
 
+            // The time span between accept and recv is valid.
             if(0<count) {
                 Stop_recv_timer(trans_pid);
             }

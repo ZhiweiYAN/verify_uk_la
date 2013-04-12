@@ -28,7 +28,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 {
     int ret = 0;
 
-    char buf_send_terminal[MAXPACKETSIZE];
+    char buf_send_terminal[MAX_SIZE_BUFFER_SEND];
     int buf_send_terminal_len = 0;
 
     char *send_terminal_cipher_text = NULL;
@@ -59,7 +59,8 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         return -1;
     }
 
-    bzero(buf_send_terminal, MAXPACKETSIZE);
+    // the variable buf_send_terminal is static array.
+    bzero(buf_send_terminal, MAX_SIZE_BUFFER_SEND);
 
     common_pkt_header = (struct CommonPacketHeader *)malloc(sizeof(struct CommonPacketHeader));
     if (NULL == common_pkt_header) {
@@ -117,17 +118,16 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
     cipher_text = (unsigned char *)packet + VERIFY_PKT_HEADER_LENGTH;
     cipher_text_len = packet_size - VERIFY_PKT_HEADER_LENGTH;
-	//(unsigned int) (veri_pkt_hdr.payload_len);
     to_proxy_plain_text = NULL;
     to_proxy_plain_text_len = 0;
 
-    //De-encrypt and Validate signature
     pre_pkt_len = VERIFY_PKT_MSG_TYPE_LENGTH + VERIFY_PKT_TERMINAL_ID_LENGTH + VERIFY_PKT_WORKER_ID_LENGTH;
     memcpy(buf_send_terminal, packet, pre_pkt_len);
 
     //malloc? free?
     //The memory for the variable 'to_proxy_plain_text' will be allocated in the
     //function decrypt_and_validate_sign().
+    //De-encrypt and Validate signature
     ret = decrypt_and_validate_sign(server_private_key, terminal_pub_key,
                                     cipher_text, cipher_text_len,
                                     &to_proxy_plain_text, &to_proxy_plain_text_len);
@@ -160,7 +160,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     DBG("Send to proxy packet %d bytes: |%s|.\n", to_proxy_plain_text_len, to_proxy_plain_text);
 
     //Prepare the memory for the packet from the server proxy.
-    from_proxy_plain_text = (unsigned char *)malloc(MAX_SIZE_BUFFER_RECV+1);
+    from_proxy_plain_text = (unsigned char *)malloc(MAX_SIZE_BUFFER_RECV);
     if(NULL==from_proxy_plain_text) {
         OUTPUT_ERROR;
         LOG(ERROR)<<"memory malloc for the variable from_proxy_plain_text, failed.";
@@ -168,7 +168,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
         buf_send_terminal_len = strlen(buf_send_terminal);
         goto Do_verify_procedures_END;
     } else {
-        bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV+1);
+        bzero(from_proxy_plain_text, MAX_SIZE_BUFFER_RECV);
     }
 
     //connect to proxy server as random mode, send plain text pkt to proxy server
@@ -186,7 +186,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     //add signature and en-crypt the backward pkt
     if(1==ret && 0< from_proxy_plain_text_len) {
 
-        bzero(buf_send_terminal, MAXPACKETSIZE);
+        bzero(buf_send_terminal, MAX_SIZE_BUFFER_SEND);
         send_terminal_cipher_text_len = 0;
         //the variable 'send_terminal_cipher_text' memory is allocated in the function 'Sign_and_encrypt_plain_text'.
         ret = Sign_and_encrypt_plain_text(terminal_pub_key, server_private_key,
@@ -196,16 +196,16 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
                                           (unsigned int *) &send_terminal_cipher_text_len);
 
         //if we can add signature and encrypt the backward packet successfully.
-        memset(buf_send_terminal, 0, buf_send_terminal_len);
+        //memset(buf_send_terminal, 0, buf_send_terminal_len);
         if(1==ret && 0<send_terminal_cipher_text_len) {
             memset(buf_send_terminal, '0', VERIFY_PKT_HEADER_LENGTH);
             memcpy(buf_send_terminal, packet, VERIFY_PKT_MSG_TYPE_LENGTH+VERIFY_PKT_TERMINAL_ID_LENGTH+VERIFY_PKT_WORKER_ID_LENGTH);
             memset(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, '0', VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
             strncpy(buf_send_terminal+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                     "SUCCESS",VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_LENGTH);
-			
-			char cipher_text_len_str[VERIFY_PKT_PAYLOAD_LEN_LENGTH+1];
-			snprintf(cipher_text_len_str, VERIFY_PKT_PAYLOAD_LEN_LENGTH, "%06d", send_terminal_cipher_text_len);
+
+            char cipher_text_len_str[VERIFY_PKT_PAYLOAD_LEN_LENGTH+1];
+            snprintf(cipher_text_len_str, VERIFY_PKT_PAYLOAD_LEN_LENGTH, "%06d", send_terminal_cipher_text_len);
             memcpy(buf_send_terminal+VERIFY_PKT_PAYLOAD_LEN_POSITION,
                    cipher_text_len_str,
                    VERIFY_PKT_PAYLOAD_LEN_LENGTH);
@@ -397,7 +397,7 @@ int Save_trans_pkt_into_backup_db(struct CommonPacketHeader *common_pkt_header, 
 }
 
 //Similar to Get_import_level() functions.
-// 1 means to save it into db, 0 not.
+// 1 means to save it into db, others not.
 int Get_pkt_record_flag(char *forward_pkt_text)
 {
     int success = 0;
@@ -412,9 +412,9 @@ int Get_pkt_record_flag(char *forward_pkt_text)
     if (NULL == common_pkt_header) {
         LOG_ERROR("malloc error when parsing Common packet header, failed");
         return 0;
+    } else {
+        bzero(common_pkt_header,sizeof(struct CommonPacketHeader));
     }
-
-    bzero(common_pkt_header,sizeof(struct CommonPacketHeader));
 
     /* Get the forward_pkt_text header */
     DBG("Forward_pkt_text:|%s|.\n", forward_pkt_text);
@@ -434,21 +434,30 @@ int Get_pkt_record_flag(char *forward_pkt_text)
 
     DBG("The importance level of the packet = %d.\n", im_level);
 
-    switch (im_level) {
-    case CHARGE_PKT_IMPORTANCE_LEVEL:
+    if(0==im_level) {
+        //It is not important packet.
+        //we do not record it into db.
+        return -1;
+    } else {
         return 1;
-        break;
-    case REVERSAL_PKT_IMPORTANCE_LEVEL:
-        return 1;
-        break;
-    case QUERY_PKT_IMPORTANCE_LEVEL:
-        return 1;
-        break;
-    default:
-        return 1;
-        break;
-
     }
+
+    /*
+    	switch (im_level) {
+        case CHARGE_PKT_IMPORTANCE_LEVEL:
+            return 1;
+            break;
+        case REVERSAL_PKT_IMPORTANCE_LEVEL:
+            return 1;
+            break;
+        case QUERY_PKT_IMPORTANCE_LEVEL:
+            return 1;
+            break;
+        default:
+            return 1;
+            break;
+        }
+        */
 
 }
 /*
@@ -460,73 +469,73 @@ int Get_pkt_record_flag(char *forward_pkt_text)
 int Prepare_error_response_packet(char *pkt, int error_code)
 {
     int ret = 0;
-	char *common_pkt_erro_code = NULL;
-	char *common_pkt_erro_info = NULL;
+    char *common_pkt_erro_code = NULL;
+    char *common_pkt_erro_info = NULL;
 
     // all default values for the following fields are spaces.
     memset(pkt, ' ', VERIFY_PKT_HEADER_LENGTH);
 
     common_pkt_erro_info = pkt + VERIFY_PKT_HEADER_LENGTH + ERROR_MEMO_POSITION;
-	common_pkt_erro_code = pkt + VERIFY_PKT_HEADER_LENGTH + INNER_SUCCESS_FLAG_POSITION;
-	
-	//memcpy(common_pkt_erro_code, INNER_ERROR_CODE, INNER_SUCCESS_FLAG_LENGTH);
+    common_pkt_erro_code = pkt + VERIFY_PKT_HEADER_LENGTH + INNER_SUCCESS_FLAG_POSITION;
+
+    //memcpy(common_pkt_erro_code, INNER_ERROR_CODE, INNER_SUCCESS_FLAG_LENGTH);
     //Attation plz: the length of msg memo must be less than 45 characters.
     switch (error_code) {
     case ERROR_DECRYPT:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"01", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "01", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_DECRYPT_INFO,
                strlen(ERROR_DECRYPT_INFO));
-		//memcpy(common_pkt_erro_info, ERROR_DECRYPT_INFO, strlen(ERROR_DECRYPT_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_DECRYPT_INFO, strlen(ERROR_DECRYPT_INFO));
         break;
     case ERROR_VALIDATE_SIGN:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"02", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "02", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_VALIDATE_SIGN_INFO,
-               strlen(ERROR_VALIDATE_SIGN_INFO));		
-		//memcpy(common_pkt_erro_info, ERROR_VALIDATE_SIGN_INFO, strlen(ERROR_VALIDATE_SIGN_INFO));
-		break;
+               strlen(ERROR_VALIDATE_SIGN_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_VALIDATE_SIGN_INFO, strlen(ERROR_VALIDATE_SIGN_INFO));
+        break;
     case ERROR_LINK_PROXY:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"03", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "03", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_LINK_PROXY_INFO,
                strlen(ERROR_LINK_PROXY_INFO));
-		//memcpy(common_pkt_erro_info, ERROR_LINK_PROXY_INFO, strlen(ERROR_LINK_PROXY_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_LINK_PROXY_INFO, strlen(ERROR_LINK_PROXY_INFO));
         break;
     case ERROR_INCOMPLETE_PKT:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"04", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "04", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_INCOMPLETE_PKT_INFO,
                strlen(ERROR_INCOMPLETE_PKT_INFO));
-		//memcpy(common_pkt_erro_info, ERROR_INCOMPLETE_PKT_INFO, strlen(ERROR_INCOMPLETE_PKT_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_INCOMPLETE_PKT_INFO, strlen(ERROR_INCOMPLETE_PKT_INFO));
         break;
     case ERROR_NO_TERMINAL_RSA_PUBKEY:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"05", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "05", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_NO_TERMINAL_RSA_PUBKEY_INFO,
                strlen(ERROR_NO_TERMINAL_RSA_PUBKEY_INFO));
-		//memcpy(common_pkt_erro_info, ERROR_NO_TERMINAL_RSA_PUBKEY_INFO, strlen(ERROR_NO_TERMINAL_RSA_PUBKEY_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_NO_TERMINAL_RSA_PUBKEY_INFO, strlen(ERROR_NO_TERMINAL_RSA_PUBKEY_INFO));
         break;
     case ERROR_NO_SRV_RSA_PRIKEY:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"06", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "06", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_NO_SRV_RSA_PRIKEY_INFO,
                strlen(ERROR_NO_SRV_RSA_PRIKEY_INFO));
-		//memcpy(common_pkt_erro_info, ERROR_NO_SRV_RSA_PRIKEY_INFO, strlen(ERROR_NO_SRV_RSA_PRIKEY_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_NO_SRV_RSA_PRIKEY_INFO, strlen(ERROR_NO_SRV_RSA_PRIKEY_INFO));
         break;
     case ERROR_MEMORY_LACK:
-        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION, 
-			"07", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
+        memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_POSITION,
+               "07", VERIFY_PKT_RESPONSE_MSG_TYPE_FROM_VERIFY_SERVER_LENGTH);
         memcpy(pkt+VERIFY_PKT_RESPONSE_MSG_FROM_VERIFY_SERVER_POSITION,
                ERROR_MEMORY_LACK_INFO,
                strlen(ERROR_MEMORY_LACK_INFO));
-		//memcpy(common_pkt_erro_info, ERROR_MEMORY_LACK_INFO, strlen(ERROR_MEMORY_LACK_INFO));
+        //memcpy(common_pkt_erro_info, ERROR_MEMORY_LACK_INFO, strlen(ERROR_MEMORY_LACK_INFO));
         break;
 
     default:
@@ -577,7 +586,7 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
 
     //Examine the packet length whether it is valid or not.
     int payload_len = 0;
-	payload_len = atoi(pkt_header->payload_len);
+    payload_len = atoi(pkt_header->payload_len);
     if(payload_len==pkt_len-VERIFY_PKT_HEADER_LENGTH) {
 
         //Good
@@ -585,7 +594,7 @@ int Parse_verify_pkt_header(char* pkt, int pkt_len, VerifyPacketHeader *pkt_head
     } else {
 
         //Bad
-		LOG_ERROR("Payload bytes: %s, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
+        LOG_ERROR("Payload bytes: %s, pkt_len: %d, VERIFY_PKT_HEADER_LENGTH: %d.\n", pkt_header->payload_len, pkt_len, VERIFY_PKT_HEADER_LENGTH);
         return -1;
     }
 
@@ -661,14 +670,12 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
     srand((unsigned int) t);
     verify_srv_num = global_par.system_par.verify_number;
 
-
     if(1==verify_srv_num) {
         i = 0;
     } else {
         i = 0 + (int) ( 1.0 * verify_srv_num * rand() / (RAND_MAX + 1.0));
 
     }
-
     conn_db = Connect_db_server(global_par.system_par.verify_database_user[i],
                                 global_par.system_par.verify_database_password[i],
                                 global_par.system_par.verify_database_name,
@@ -680,7 +687,7 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
 
 
     //generate query string
-    sprintf(query_string, "SELECT pub_key from t_terminal_ukey_pubkey where terminal_id=\'%s\' AND worker_id=\'%s\';",
+    sprintf(query_string, "SELECT pub_key from terminal_ukey_pubkey where terminal_id=\'%s\' AND worker_id=\'%s\';",
             (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id));
 
     /* Send the query to primary database */
@@ -712,10 +719,10 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
         results_string = PQgetvalue(res,0,0);
         results_string_len = PQgetlength(res, 0, 0);
 
-        DBG("\n%s |%s|\n", "RSA Get_terminal_pub_key:", results_string);
+        DBG("\nRSA Get terminal pub key with len = %d, |%s|\n", results_string_len, results_string);
         DLOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
 
-        pub_key_bin_buffer = str2binary((char*)results_string, strlen( results_string ));
+        pub_key_bin_buffer = str2binary((char*)results_string, results_string_len );
 
 //      pub_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
 //		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
@@ -723,8 +730,8 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
         if(NULL!=pub_key_bin_buffer) {
             *pub_key = Convert_der_to_rsa_for_pub_key((unsigned char*)pub_key_bin_buffer, PUB_KEY_DER_LEN);
             if(NULL==*pub_key) {
-                DBG("DER TO RSA, Error");
-                LOG(ERROR)<<"Terminal pubkey DER TO RSA, Error.";
+                DBG("Terminal public key DER TO RSA, Error");
+                LOG(ERROR)<<"Terminal public key DER TO RSA, Error.";
                 ret = -1;
             }
         }
@@ -800,7 +807,7 @@ int Get_server_private_key_from_db(RSA **key)
     }
 
     //generate query string
-    sprintf(query_string, "SELECT rsa_key FROM verify_srv_rsa where enable=1;");
+    sprintf(query_string, "SELECT rsa_key FROM verify_srv_rsa where enable_flag=1;");
 
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
@@ -825,18 +832,18 @@ int Get_server_private_key_from_db(RSA **key)
         results_string = PQgetvalue(res,0,0);
         results_string_len = PQgetlength(res, 0, 0);
 
-        DBG("\n%s |%s|\n", "RSA Get_server_pri_key:", results_string);
-        //DLOG(INFO)<<"RSA Get_server_pri_key:"<<results_string;
+        DBG("\nRSA Get_server_pri_key with len=:%d, |%s|\n", results_string_len , results_string);
 
-        private_key_bin_buffer = str2binary((char*)results_string, strlen( results_string ));
+        //results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
 
-//		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
+        //the memory of 'private_key_bin_buffer' will be allocated in the function 'str2binary'
+        private_key_bin_buffer = str2binary((char*)results_string, results_string_len);
 
         if(NULL!=private_key_bin_buffer) {
-            *key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, strlen( results_string )*2);
+            *key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, results_string_len*2);
             if(NULL==*key) {
-                DBG("DER TO RSA, Error");
-                LOG(ERROR)<<"Server_pri_key DER TO RSA, Error.";
+                DBG("Srv Private Key DER TO RSA, Error");
+                LOG(ERROR)<<"Srv_pri_key DER TO RSA, Error.";
                 ret = -1;
             }
         }
@@ -847,10 +854,10 @@ int Get_server_private_key_from_db(RSA **key)
         private_key_bin_buffer = NULL;
     }
 
-
-    PQclear(res);
-    res = NULL;
-
+    if(NULL!=res) {
+        PQclear(res);
+        res = NULL;
+    }
 
     /* Free the DB resource */
     PQfinish((PGconn*)(conn_db));
@@ -923,7 +930,6 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
 
     /* Connect the database */
     conn = PQconnectdb(conn_string);
-
     if (PQstatus(conn) != CONNECTION_OK) {
         LOG(ERROR)<<"Connect to DB, failed." << "detail: " <<conn_string;
         OUTPUT_ERROR;
