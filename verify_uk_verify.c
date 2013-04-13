@@ -175,12 +175,12 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
     //and wait for backward pkt from proxy server.
     from_proxy_plain_text_len = 0;
     ret = SendRecv_message_to_proxy((char *)to_proxy_plain_text, to_proxy_plain_text_len,
-                                    (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
+                               (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
     //begin debug
-    //ret = 1;
-    //from_proxy_plain_text_len = 16;
-    //memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
+//    ret = 1;
+//    from_proxy_plain_text_len = 16;
+//    memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
     //end debug
 
     //add signature and en-crypt the backward pkt
