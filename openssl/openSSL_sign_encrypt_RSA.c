@@ -133,13 +133,13 @@ char *unbase64(unsigned char *input, int length)
     return buffer;
 }
 
-char* str2binary( char* str, int str_len)
+char* str2binary( char* str, int str_len, int *hex_len)
 {
     int i = 0;
 
     char* hex = NULL;
 
-    int hex_len;
+    //int hex_len;
 
     int hex_sum = str_len/2;
 
@@ -161,6 +161,7 @@ char* str2binary( char* str, int str_len)
 
     hex = (char*)malloc(hex_sum);
     if(NULL==hex) {
+		*hex_len =0;
         goto str2binary_END;
     } else {
         bzero(hex, hex_sum);
@@ -170,7 +171,7 @@ char* str2binary( char* str, int str_len)
         memset((char*)hex+i, *(hex_value+i), 1);
     }
 
-    hex_len =hex_sum;
+    *hex_len =hex_sum;
 str2binary_END:
 
     if(NULL!=hex_value) {
@@ -644,13 +645,13 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
 
 
     // malloc space for decrypt
-    decrypt = (unsigned char *)malloc(cipher_text_len);
+    decrypt = (unsigned char *)malloc(cipher_text_len+1);
     if(NULL==decrypt) {
         LOG(ERROR)<<"malloc, failed";
         ret = -1;
         goto err;
     } else {
-        memset(decrypt, 0 , cipher_text_len);
+        memset(decrypt, 0 , cipher_text_len+1);
         p = decrypt;
     }
 
@@ -686,28 +687,28 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
     //LOG(INFO)<<"Decrypt txt: "<< hex2str(decrypt+sig_len, );
     //split the signature text and plain text
     sig_len = RSA_size(signers_pub_key_for_signature);
-    sig = (unsigned char *)malloc(sig_len);
+    sig = (unsigned char *)malloc(sig_len+1);
     if(NULL==sig) {
         LOG(ERROR)<<"malloc, failed";
         ret = -1;
         goto err;
     } else {
         // memcpy(sig, decrypt+ctlen-sig_len, sig_len);
-        bzero(sig, sig_len);
+        bzero(sig, sig_len+1);
         memcpy(sig, decrypt, sig_len);
         DLOG(INFO)<<"signature_len:"<<sig_len<<hex2str(sig,sig_len);
     }
 
 
     *plain_text_len = ctlen - sig_len;
-    *plain_text = (unsigned char *)malloc(*plain_text_len);
-    bzero(*plain_text, *plain_text_len);
+    *plain_text = (unsigned char *)malloc(*plain_text_len+1);
+    //bzero(*plain_text, *plain_text_len+1);
     if(NULL==*plain_text) {
         LOG(ERROR)<<"malloc, failed";
         ret = -1;
         goto err;
     } else {
-        bzero(*plain_text, *plain_text_len);
+        bzero(*plain_text, *plain_text_len+1);
         memcpy(*plain_text, decrypt+sig_len,  *plain_text_len);
         DLOG(INFO)<<"output, plain_text_len: "<<*plain_text_len;
         DLOG(INFO)<<"output, plain_text: |"<<*plain_text <<"|";

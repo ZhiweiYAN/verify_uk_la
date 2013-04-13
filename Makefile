@@ -10,7 +10,7 @@ AR=ar
 
 ifdef REL
 CFLAGS= -O2 -s -DNDEBUG 
-TARGET=run_gdlian_verify_uk_release_version
+TARGET=run_gdlian_db_verify_uk_release_version
 else
 CFLAGS= -g -Wall -DDEBUG -O0 -gdwarf-2 -g3
 TARGET=run_gdlian_db_verify_uk_debug_version

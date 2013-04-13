@@ -217,7 +217,7 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
 
         //if there are errors when we send pkts to the proxy server.
         OUTPUT_ERROR;
-        LOG_ERROR("The link with proxy server seems down. pkt from proxy server = |%s|\n;", from_proxy_plain_text);
+        LOG_ERROR("The link with proxy server seems down. \nThe packet from proxy server = |%s|", from_proxy_plain_text);
         //LOG(ERROR)<<"The link with proxy server seems down.";
         Prepare_error_response_packet(buf_send_terminal, ERROR_LINK_PROXY);
         buf_send_terminal_len = strlen(buf_send_terminal);
@@ -687,8 +687,8 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
 
 
     //generate query string
-    sprintf(query_string, "SELECT pub_key from terminal_ukey_pubkey where terminal_id=\'%s\' AND worker_id=\'%s\';",
-            (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id));
+    sprintf(query_string, "SELECT pub_key from %s where terminal_id=\'%s\' AND worker_id=\'%s\' AND enable_flag=1;",
+            TERMINAL_PUB_KEY_TABLE_NAME, (char*)(pkt_header->terminal_id), (char*)(pkt_header->worker_id));
 
     /* Send the query to primary database */
     res = PQexec(conn_db, query_string);
@@ -715,20 +715,22 @@ int Get_terminal_pub_key_from_db(RSA **pub_key, VerifyPacketHeader *pkt_header)
     /* If there are more than one records, return the first one */
     if (PQntuples(res)>=1) {
 
-        /* Only return first tuple*/
+        /* Only use first tuple*/
         results_string = PQgetvalue(res,0,0);
         results_string_len = PQgetlength(res, 0, 0);
 
         DBG("\nRSA Get terminal pub key with len = %d, |%s|\n", results_string_len, results_string);
         DLOG(INFO)<<"RSA Get_terminal_pub_key:"<<results_string;
 
-        pub_key_bin_buffer = str2binary((char*)results_string, results_string_len );
+		int pub_key_bin_buffer_len = 0;
+
+        pub_key_bin_buffer = str2binary((char*)results_string, results_string_len, &pub_key_bin_buffer_len );
 
 //      pub_key_bin_buffer = unbase64((unsigned char*)results_string, strlen( results_string ));
 //		results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
 
         if(NULL!=pub_key_bin_buffer) {
-            *pub_key = Convert_der_to_rsa_for_pub_key((unsigned char*)pub_key_bin_buffer, PUB_KEY_DER_LEN);
+            *pub_key = Convert_der_to_rsa_for_pub_key((unsigned char*)pub_key_bin_buffer, pub_key_bin_buffer_len);
             if(NULL==*pub_key) {
                 DBG("Terminal public key DER TO RSA, Error");
                 LOG(ERROR)<<"Terminal public key DER TO RSA, Error.";
@@ -837,7 +839,8 @@ int Get_server_private_key_from_db(RSA **key)
         //results_string = base64(pub_key_bin_buffer, const unsigned char * input,int length)
 
         //the memory of 'private_key_bin_buffer' will be allocated in the function 'str2binary'
-        private_key_bin_buffer = str2binary((char*)results_string, results_string_len);
+        int private_key_bin_buffer_len = 0;
+        private_key_bin_buffer = str2binary((char*)results_string, results_string_len, &private_key_bin_buffer_len);
 
         if(NULL!=private_key_bin_buffer) {
             *key = Convert_der_to_rsa_for_private_key((unsigned char*)private_key_bin_buffer, results_string_len*2);

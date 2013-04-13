@@ -17,6 +17,8 @@
 
 #include "./openssl/openssl_sign_encrypt_rsa.h"
 
+#define TERMINAL_PUB_KEY_TABLE_NAME "terminal_ukey_pubkey"
+
 int Do_verify_procedures(int connection_sd,char *packet,int packet_size);
 
 int Prepare_error_response_packet(char *pkt, int error_code);

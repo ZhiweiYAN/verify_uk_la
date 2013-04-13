@@ -296,8 +296,8 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                     //Increase_half_lifetime_record_process(ptr, prcs_num);
                 } else {
                     LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was not killed successfully although its invalid connection: "<<(ptr+i)->recv_delay_time;
-                    perror("VERIFY_PROCESS was killed, but kill operation faild");
-                    printf("\n\033[35mThe VERIFY_PROCESS %d  should be killed. But killing operation failed.\033[0m\n",(ptr+i)->pid);
+                    //perror("VERIFY_PROCESS was killed, but kill operation faild");
+                    //printf("\n\033[35mThe VERIFY_PROCESS %d  should be killed. But killing operation failed.\033[0m\n",(ptr+i)->pid);
                 }
                 (ptr+i)->pid = 0;
                 (ptr+i)->life_time = 0;
