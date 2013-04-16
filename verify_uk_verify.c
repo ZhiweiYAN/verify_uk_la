@@ -178,9 +178,9 @@ int Do_verify_procedures(int connection_sd, char *packet, int packet_size)
                                (char *)from_proxy_plain_text, (int *)&from_proxy_plain_text_len);
 
     //begin debug
-//    ret = 1;
-//    from_proxy_plain_text_len = 16;
-//    memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
+    //ret = 1;
+    //from_proxy_plain_text_len = 16;
+    //memcpy(from_proxy_plain_text, "1234567890ABCDEF", from_proxy_plain_text_len);
     //end debug
 
     //add signature and en-crypt the backward pkt
@@ -928,7 +928,7 @@ PGconn *Connect_db_server(char *user_name, char *password,char *db_name,char *ip
     }
 
     bzero(conn_string,COMM_LENGTH);
-    sprintf(conn_string,"user=%s password=%s dbname=%s hostaddr=%s",user_name,password,db_name,ip_addr);
+    sprintf(conn_string,"user=%s password=%s dbname=%s hostaddr=%s port=6432",user_name,password,db_name,ip_addr);
     DBG("Connect to DB: |%s|\n",conn_string);
 
     /* Connect the database */

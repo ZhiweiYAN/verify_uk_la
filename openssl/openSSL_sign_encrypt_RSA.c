@@ -724,40 +724,41 @@ int decrypt_and_validate_sign(RSA *receiver_pub_private_key_for_decrypt,
         ret = -1;
         goto err;
     }
-//    //verify the signature of signer.
-//    RSA_blinding_on(signers_pub_key_for_signature, tctx_verify);
-//	ret = RSA_verify(NID_sha1, hash, SHA1_LEN, sig, RSA_size(signers_pub_key_for_signature), signers_pub_key_for_signature);
+    //verify the signature of signer.
+    RSA_blinding_on(signers_pub_key_for_signature, tctx_verify);
+	ret = RSA_verify(NID_sha1, hash, SHA1_LEN, sig, RSA_size(signers_pub_key_for_signature), signers_pub_key_for_signature);
 
-//    if (1!=ret){
-//        LOG(ERROR)<<"RSA verify, failed";
-//		print_rsa_error_string();
-//        ret = -1;
-//       goto err;
-//    }
+    if (1!=ret){
+        LOG(ERROR)<<"RSA verify, failed";
+		print_rsa_error_string();
+        ret = -1;
+       goto err;
+    }
+    DLOG(INFO)<<"RSA verify, success";
 
 
     //decrypt signature with pubkey_terminal, comparing to sha1 of plain txt byte to byte.
-    unsigned char sig_decrypt[SHA1_LEN];
-    memset(sig_decrypt, 0, SHA1_LEN);
-
-    ret = RSA_public_decrypt(RSA_size(signers_pub_key_for_signature),
-                             sig, sig_decrypt, signers_pub_key_for_signature, padding_mode);
-
-    if(-1==ret) {
-        print_rsa_error_string();
-        goto err;
-    } else {
-        DLOG(INFO)<<hex2str(sig_decrypt,SHA1_LEN)<<"signature txt:" ;
-        DLOG(INFO)<<hex2str(hash, SHA1_LEN)<<"recv signature txt:";
-    }
-
-    ret = memcmp(hash,sig_decrypt, SHA1_LEN);
-
-    if(0==ret) {
-        ret = 1;
-    } else {
-        ret = -1;
-    }
+//    unsigned char sig_decrypt[SHA1_LEN];
+//    memset(sig_decrypt, 0, SHA1_LEN);
+//
+//    ret = RSA_public_decrypt(RSA_size(signers_pub_key_for_signature),
+//                             sig, sig_decrypt, signers_pub_key_for_signature, padding_mode);
+//
+//    if(-1==ret) {
+//        print_rsa_error_string();
+//        goto err;
+//    } else {
+//        DLOG(INFO)<<hex2str(sig_decrypt,SHA1_LEN)<<"signature txt:" ;
+//        DLOG(INFO)<<hex2str(hash, SHA1_LEN)<<"recv signature txt:";
+//    }
+//
+//    ret = memcmp(hash,sig_decrypt, SHA1_LEN);
+//
+//    if(0==ret) {
+//        ret = 1;
+//    } else {
+//        ret = -1;
+//    }
 
 
 err:
