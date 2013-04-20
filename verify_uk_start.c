@@ -195,7 +195,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
         }
 
         sprintf(peeraddrstr, "%s", inet_ntoa(peer.sin_addr));
-        printf("\n\n\033[36mA connection from IP %s has arrived.\033[0m\n", peeraddrstr);
+        printf("\n\n\033[36m>>> A connection from IP [ %s ] has arrived.\033[0m\n", peeraddrstr);
         fflush(NULL);
 
         int ava_slot_num = 0;
@@ -237,7 +237,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
 
             pid_t trans_pid = 0;
             trans_pid = getpid();
-            ret  = Insert_pid_process_table(trans_pid,VERIFY_PROCESS_DEADLINE,VERIFY_PROCESS);
+            ret  = Insert_pid_process_table(trans_pid,VERIFY_PROCESS_DEADLINE,VERIFY_PROCESS, peeraddrstr);
             buf_recv = (char*)malloc(sizeof(char)*MAX_SIZE_BUFFER_RECV);
             if (NULL==buf_recv) {
                 LOG(ERROR)<<"malloc buf_recv, failed.";
@@ -247,7 +247,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
                 bzero(buf_recv,MAX_SIZE_BUFFER_RECV);
             }
 
-            /* Terminal:Receiving data from terminals*/
+            /* Terminal:Receive data from terminals*/
             count = recv(connection_sd,buf_recv,MAX_SIZE_BUFFER_RECV,0);
 
             // The time span between accept and recv is valid.
@@ -261,7 +261,7 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
             //validate the length of the packet
             if(MINIMUM_TERMINAL_PKT_LEN>count) {
                 //Too small packet, invalid!
-                count = send(connection_sd, "\nWelcome to our center.\n", strlen("\nWelcome to our center.\n"), 0);
+                count = send(connection_sd, "\nWelcome to the LiAn Data Center.\n", strlen("\nWelcome to the LiAn Data Center.\n"), 0);
                 goto END;
             }
 
@@ -272,8 +272,8 @@ int Daemon_db_verify_uk_server(int welcome_sd,struct sockaddr_in *sa)
                 LOG(ERROR)<<"malloc packet, failed.";
                 goto END;
             } else {
-                bzero(packet,sizeof(char)*(count+1));
-                memcpy(packet,buf_recv,count);
+                bzero(packet, sizeof(char)*(count+1));
+                memcpy(packet, buf_recv,count);
             }
 
             /* Deal with the packet in the following function, there is a function

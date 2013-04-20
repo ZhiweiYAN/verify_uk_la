@@ -28,7 +28,7 @@
  * 		1 ---> success
  * 		-1 ---> failure
  * *************************************************/
-int Insert_pid_process_table(pid_t pid,int deadline,enum ProcessType type)
+int Insert_pid_process_table(pid_t pid,int deadline,enum ProcessType type, char* ip_str)
 {
     void * mem_ptr = NULL;
     int success = 0;
@@ -38,7 +38,7 @@ int Insert_pid_process_table(pid_t pid,int deadline,enum ProcessType type)
     mem_ptr = MappingShareMemOwnSpace(PROCESS_SHARE_ID);
 
     /*  insert the pid of the process into the table */
-    success = Register_process_into_process_table(((struct ShareMemProcess *)mem_ptr)->process_table,MAX_PROCESS_NUMBRER,pid,deadline,type);
+    success = Register_process_into_process_table(((struct ShareMemProcess *)mem_ptr)->process_table,MAX_PROCESS_NUMBRER,pid,deadline,type, ip_str);
 
     /* Free memory control handler */
     success = UnmappingShareMem((void*)mem_ptr);
@@ -123,7 +123,7 @@ int Set_process_life_time(pid_t pid, int life_time)
  * 		1 ---> success;
  * 		-1 ---> failure
  * *************************************************/
-int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs_num,pid_t pid,int deadline,enum ProcessType type)
+int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs_num,pid_t pid,int deadline,enum ProcessType type, char *ip_str)
 {
     int i = 0;
     int j = 0;
@@ -145,6 +145,7 @@ int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs
             (ptr+i)->deadline = deadline;
             (ptr+i)->type = type;
             (ptr+i)->process_step = 0;
+			memcpy((ptr+i)->ip_str, ip_str, IP_STRING_LEN);
             //if(RECORD_PROCESS==type||SYNC_PROCESS==type)
             //printf("\r\033[33mRegister PID %d is OK in slot %d\033[0m. \n",pid,i);
             break;
@@ -184,6 +185,7 @@ int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int pr
             (ptr+i)->deadline = 0;
             (ptr+i)->type = NORMAL_PROCESS;
             (ptr+i)->process_step = 0;
+			memset((ptr+i)->ip_str, 0, IP_STRING_LEN);
             //printf("\r\033[36mUnRegister PID %d is OK from slot %d.\033[0m. \n",pid,i);
             break;
             fflush(NULL);
@@ -260,13 +262,13 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 success = kill((ptr+i)->pid,SIGKILL);
                 waitpid(-1,NULL,WNOHANG);
                 if (0==success) {
-                    LOG_WARNING("VERIFY_PROCESS %d was killed due to its deadline (%d sec).\n",(ptr+i)->pid,(ptr+i)->deadline);
+                    LOG_WARNING("Kill pid %d trigered by %s, reach to deadline (%d sec). OK.\n",(ptr+i)->pid,(ptr+i)->ip_str, (ptr+i)->deadline);
                     //LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was killed due to lifetime: "<<(ptr+i)->deadline;
                     //Increase_half_lifetime_record_process(ptr, prcs_num);
                 } else {
-                    LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was not killed successfully although its lifetime expires: "<<(ptr+i)->deadline;
-                    perror("VERIFY_PROCESS was killed, but kill operation faild");
-                    printf("\n\033[35mThe VERIFY_PROCESS %d  should be killed. But killing operation failed.\033[0m\n",(ptr+i)->pid);
+                    LOG_ERROR("Kill pid %d trigered by %s, reach to deadline (%d sec). Failed.\n",(ptr+i)->pid,(ptr+i)->ip_str, (ptr+i)->deadline);
+					//perror("VERIFY_PROCESS was killed, but kill operation faild");
+                    //printf("\n\033[35mThe VERIFY_PROCESS %d  should be killed. But killing operation failed.\033[0m\n",(ptr+i)->pid);
                 }
                 (ptr+i)->pid = 0;
                 (ptr+i)->life_time = 0;
@@ -275,6 +277,7 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 (ptr+i)->recv_delay_time = 0;
                 (ptr+i)->type = NORMAL_PROCESS;
                 (ptr+i)->process_step = 0;
+				memset((ptr+i)->ip_str, 0, IP_STRING_LEN);
                 success = Unregister_process_from_process_table(ptr, prcs_num, (ptr+i)->pid);
                 break;
             default:
@@ -291,11 +294,11 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
                 success = kill((ptr+i)->pid,SIGKILL);
                 waitpid(-1,NULL,WNOHANG);
                 if (0==success) {
-                    LOG_WARNING("VERIFY_PROCESS %d was killed due to its invalid connection (%d sec).\n",(ptr+i)->pid,(ptr+i)->recv_delay_time);
+                    LOG_WARNING("Kill pid %d trigered by %s, invalid connection (%d sec). OK.\n",(ptr+i)->pid,(ptr+i)->ip_str, (ptr+i)->recv_delay_time);
                     //LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was killed due to lifetime: "<<(ptr+i)->deadline;
                     //Increase_half_lifetime_record_process(ptr, prcs_num);
                 } else {
-                    LOG(ERROR)<<"VERIFY_PROCESS "<<(ptr+i)->pid <<", was not killed successfully although its invalid connection: "<<(ptr+i)->recv_delay_time;
+                    LOG_ERROR("Kill pid %d trigered by %s, invalid connection (%d sec). Failed.\n",(ptr+i)->pid,(ptr+i)->ip_str, (ptr+i)->recv_delay_time);
                     //perror("VERIFY_PROCESS was killed, but kill operation faild");
                     //printf("\n\033[35mThe VERIFY_PROCESS %d  should be killed. But killing operation failed.\033[0m\n",(ptr+i)->pid);
                 }
@@ -313,6 +316,7 @@ int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num)
             }
             fflush(NULL);
             google::FlushLogFiles(google::ERROR);
+            google::FlushLogFiles(google::WARNING);
             google::FlushLogFiles(google::INFO);
             usleep(100);
         }
@@ -417,10 +421,10 @@ int Stop_recv_timer(pid_t pid)
 
     for (j=0; j<MAX_PROCESS_NUMBRER; j++) {
         if(pid==(process_ptr+j)->pid) {
-            if(MIN_TIME_SPAN_ACCEPT_RECV<(process_ptr+j)->recv_delay_time) {
+            //if(MIN_TIME_SPAN_ACCEPT_RECV>(process_ptr+j)->recv_delay_time) {
                 (process_ptr+j)->recv_timer_stop = 1;
                 break;
-            }
+            //}
         }
     }
 

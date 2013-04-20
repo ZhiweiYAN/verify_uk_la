@@ -26,6 +26,8 @@
 
 #define SERVER_PRIVATE_KEY_PEM_FILE "./openssl/yao_lagate.pem"
 
+#define IP_STRING_LEN 16
+
 #define MINIMUM_TERMINAL_PKT_LEN 32
 
 /* for the common packet header */
@@ -113,7 +115,7 @@
 
 #define MIN_DELAY_TIME 20
 
-#define PROCESS_SHARE_ID 108
+#define PROCESS_SHARE_ID 508
 
 #define BACKLOG 1024
 #define MAX_PROCESS_NUMBRER 512
@@ -210,6 +212,7 @@ struct ChildProcessStatus {
     int deadline;
     enum ProcessType type;
     int process_step;
+	char ip_str[IP_STRING_LEN];
 };
 
 struct ShareMemProcess {

@@ -23,9 +23,9 @@
 #include "verify_uk_common.h"
 #include "check.h"
 
-int Insert_pid_process_table(pid_t pid,int deadline,enum ProcessType type);
+int Insert_pid_process_table(pid_t pid,int deadline,enum ProcessType type, char* ip_str);
 int Remove_pid_process_table(pid_t pid);
-int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs_num,pid_t pid,int deadline,enum ProcessType type);
+int Register_process_into_process_table(struct ChildProcessStatus *ptr, int prcs_num,pid_t pid,int deadline,enum ProcessType type, char* ip_str);
 int Unregister_process_from_process_table(struct ChildProcessStatus *ptr, int prcs_num,pid_t pid);
 int Increase_process_life_time(struct ChildProcessStatus *ptr, int prcs_num);
 int Kill_invalid_process(struct ChildProcessStatus *ptr, int prcs_num);
