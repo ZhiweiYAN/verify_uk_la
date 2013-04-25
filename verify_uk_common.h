@@ -96,9 +96,9 @@
 #define ERROR_DECRYPT_INFO "服务器私钥解密错."
 #define ERROR_INCOMPLETE_PKT_INFO "验证包不完整."
 #define ERROR_VALIDATE_SIGN_INFO "验终端签名错."
-#define ERROR_LINK_PROXY_INFO "代理机通信中断."
-#define ERROR_NO_SRV_RSA_PRIKEY_INFO "无服务器私钥."
-#define ERROR_NO_TERMINAL_RSA_PUBKEY_INFO "无终端公钥."
+#define ERROR_LINK_PROXY_INFO "代理机通信异常，中断."
+#define ERROR_NO_SRV_RSA_PRIKEY_INFO "找服务器私钥时，出错."
+#define ERROR_NO_TERMINAL_RSA_PUBKEY_INFO "找此终端公钥时，出错."
 #define ERROR_MEMORY_LACK_INFO "服务器内存不足."
 /*
 #define ERROR_DECRYPT_INFO "decrypt cipher with srv_private_key, error!"
